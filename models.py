@@ -6,11 +6,11 @@ import bcrypt
 class Role:
     DRIVER = 'driver'
     SPONSOR = 'sponsor'
-    ADMIN = 'admin'
-    @staticmethod
+    ADMINISTRATOR = 'administrator'
     
+    @staticmethod
     def choices():
-        return [Role.DRIVER, Role.SPONSOR, Role.ADMIN]
+        return [Role.DRIVER, Role.SPONSOR, Role.ADMINISTRATOR]
 
 class User(db.Model, UserMixin):
     __tablename__ = 'users'
@@ -24,7 +24,7 @@ class User(db.Model, UserMixin):
     def set_password(self, password):
         self.password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-    def check_password(self, password):
+    def check_password(self, password: str) -> bool:
         return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
 
     def __repr__(self):

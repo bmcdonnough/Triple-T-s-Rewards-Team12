@@ -1,0 +1,28 @@
+<!-- templates/common/login.html -->
+<!doctype html>
+<html>
+  <head><meta charset="utf-8"><title>{{ title or 'Login' }}</title></head>
+  <body style="font-family: system-ui; margin:2rem;">
+    <h2>Login</h2>
+
+    <!-- show flash messages -->
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% if msgs %}
+        <ul>
+          {% for cat, msg in msgs %}
+            <li><strong>{{ cat|capitalize }}:</strong> {{ msg }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <form method="post" action="/login">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Username<br><input name="username" required></label><br><br>
+      <label>Password<br><input type="password" name="password" required></label><br><br>
+      <button type="submit">Sign in</button>
+    </form>
+
+    <p><a href="/">Home</a></p>
+  </body>
+</html>

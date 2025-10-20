@@ -1,0 +1,9 @@
+D||First Name|Last Name|Email Address|License Number
+
+# Format descriptions:
+# D||First Name|Last Name|Email Address|License Number
+# - Create a driver user and link to your organization
+# - The second field (organization) is left empty because the system will use your organization
+
+# Example:
+# D||John|Doe|john.doe@gmail.com|DL123456789

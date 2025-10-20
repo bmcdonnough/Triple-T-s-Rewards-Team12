@@ -1,0 +1,13 @@
+S|Organization Name|First Name|Last Name|Email Address
+D|Organization Name|First Name|Last Name|Email Address|License Number
+
+# Format descriptions:
+# S|Organization Name|First Name|Last Name|Email Address
+# - Create a sponsor user with organization
+#
+# D|Organization Name|First Name|Last Name|Email Address|License Number
+# - Create a driver user and link to the specified organization (organization must exist)
+
+# Example:
+# S|Triple T's Trucking|Jane|Smith|jane.smith@triplets.com
+# D|Triple T's Trucking|John|Doe|john.doe@gmail.com|DL123456789

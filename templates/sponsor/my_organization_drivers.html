@@ -26,7 +26,15 @@
                 <td>{{ driver.EMAIL }}</td>
                 <td><span class="badge bg-primary">{{ driver.POINTS }}</span></td>
                 <td>
-                    <a href="{{ url_for('sponsor_bp.manage_points_page') }}?driver_id={{ driver.USER_CODE }}" class="btn btn-sm btn-info">Manage Points</a>
+                    <a href="{{ url_for('sponsor_bp.manage_points_page') }}?driver_id={{ driver.USER_CODE }}" 
+                       class="btn btn-sm btn-info">Manage Points</a>
+
+                    <form method="POST" 
+                          action="{{ url_for('impersonation_bp.start_impersonation', target_id=driver.USER_CODE) }}" 
+                          style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Impersonate</button>
+                    </form>
                 </td>
             </tr>
             {% endfor %}

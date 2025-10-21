@@ -46,13 +46,13 @@ def admin_bulk_loading():
                 # Log the event
                 _log_audit_event('bulk_load_processed', f"Processed bulk load file: {file.filename}, "
                                 f"Total: {results['total']}, Success: {results['success']}, "
-                                f"Failed: {results['failed']}, Sponsors: {results['sponsors_created']}, "
-                                f"Drivers: {results['drivers_created']}")
+                                f"Failed: {results['failed']}, Organizations: {results['organizations_created']}, "
+                                f"Sponsors: {results['sponsors_created']}, Drivers: {results['drivers_created']}")
                 
                 # Flash message with results
                 flash(f"File processed. Total: {results['total']}, Success: {results['success']}, "
-                      f"Failed: {results['failed']}, Sponsors created: {results['sponsors_created']}, "
-                      f"Drivers created: {results['drivers_created']}", 'success')
+                      f"Failed: {results['failed']}, Organizations: {results['organizations_created']}, "
+                      f"Sponsors created: {results['sponsors_created']}, Drivers created: {results['drivers_created']}", 'success')
                 
                 # Save log file path for download
                 log_file_path = processor.log_file_path

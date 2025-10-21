@@ -2,7 +2,7 @@ import os
 import csv
 from datetime import datetime
 from flask import current_app
-from models import db, User, Sponsor, Driver, Role, AuditLog
+from models import db, User, Sponsor, Driver, Role, AuditLog, Organization
 
 class BulkLoadProcessor:
     """
@@ -24,6 +24,7 @@ class BulkLoadProcessor:
             'total': 0,
             'success': 0,
             'failed': 0,
+            'organizations_created': 0,
             'sponsors_created': 0,
             'drivers_created': 0
         }
@@ -91,23 +92,32 @@ class BulkLoadProcessor:
             data (list): Record data
             line_num (int): Line number in the file
         """
-        if record_type == 'S':
+        if record_type == 'O':
+            # Create organization
+            if len(data) >= 2:
+                org_name = data[1]
+                self._create_organization(org_name, line_num)
+            else:
+                self.results['failed'] += 1
+                self._log_result(line_num, record_type, 'Failed', str(data), 'Insufficient data for organization record')
+        
+        elif record_type == 'S':
             # Create sponsor
             if len(data) >= 5:
                 org_name, first_name, last_name, email = data[1], data[2], data[3], data[4]
                 self._create_sponsor(org_name, first_name, last_name, email, line_num)
             else:
                 self.results['failed'] += 1
-                self._log_result(line_num, record_type, 'Failed', str(data), 'Insufficient data for sponsor record')
+                self._log_result(line_num, record_type, 'Failed', str(data), 'Insufficient data for sponsor record. Format: S|Organization|FirstName|LastName|Email')
                 
         elif record_type == 'D':
             # Create driver
-            if len(data) >= 6:  # Need one more field for license number
-                org_name, first_name, last_name, email, license_number = data[1], data[2], data[3], data[4], data[5]
-                self._create_driver(org_name, first_name, last_name, email, license_number, line_num)
+            if len(data) >= 5:  # Need 5 fields: D|org|first|last|email
+                org_name, first_name, last_name, email = data[1], data[2], data[3], data[4]
+                self._create_driver(org_name, first_name, last_name, email, line_num)
             else:
                 self.results['failed'] += 1
-                self._log_result(line_num, record_type, 'Failed', str(data), 'Insufficient data for driver record')
+                self._log_result(line_num, record_type, 'Failed', str(data), 'Insufficient data for driver record. Format: D|Organization|FirstName|LastName|Email')
                 
         else:
             self.results['failed'] += 1
@@ -143,18 +153,25 @@ class BulkLoadProcessor:
             self._log_result(line_num, 'S', 'Failed', f'{first_name} {last_name} ({email})', f'Email already exists: {email}')
             return
         
-        # Check if organization already exists
+        # Check if organization exists in Organizations table
+        existing_org = Organization.query.filter_by(ORG_NAME=org_name).first()
+        if not existing_org:
+            self.results['failed'] += 1
+            self._log_result(line_num, 'S', 'Failed', f'{first_name} {last_name} ({email})', f'Organization not found: {org_name}. Please create the organization first using an O record.')
+            return
+            
+        # Check if there's already a sponsor for this organization
         existing_sponsor = Sponsor.query.filter_by(ORG_NAME=org_name).first()
         if existing_sponsor:
             self.results['failed'] += 1
-            self._log_result(line_num, 'S', 'Failed', f'{first_name} {last_name} ({email})', f'Organization already exists: {org_name}')
+            self._log_result(line_num, 'S', 'Failed', f'{first_name} {last_name} ({email})', f'Sponsor already exists for organization: {org_name}')
             return
         
         try:
             # Generate a unique username
             username = self._generate_unique_username(first_name, last_name)
             
-            # Create the user
+            # Create the user (let USER_CODE auto-increment)
             new_user = User(
                 USERNAME=username,
                 USER_TYPE=Role.SPONSOR,
@@ -162,6 +179,9 @@ class BulkLoadProcessor:
                 LNAME=last_name,
                 EMAIL=email,
                 CREATED_AT=datetime.now(),
+                POINTS=0,
+                wants_point_notifications=True,
+                wants_order_notifications=True,
                 IS_ACTIVE=1,
                 FAILED_ATTEMPTS=0,
                 IS_LOCKED_OUT=0
@@ -171,7 +191,7 @@ class BulkLoadProcessor:
             password = new_user.admin_set_new_pass()
             
             db.session.add(new_user)
-            db.session.flush()  # Get the user ID
+            db.session.commit()  # Commit the user first to get the auto-generated USER_CODE
             
             # Create the sponsor
             new_sponsor = Sponsor(
@@ -195,7 +215,7 @@ class BulkLoadProcessor:
             self._log_result(line_num, 'S', 'Failed', f'{first_name} {last_name} ({email})', f'Database error: {str(e)}')
             raise e
     
-    def _create_driver(self, org_name, first_name, last_name, email, license_number, line_num):
+    def _create_driver(self, org_name, first_name, last_name, email, line_num):
         """
         Create a new driver user
         
@@ -204,7 +224,6 @@ class BulkLoadProcessor:
             first_name (str): First name
             last_name (str): Last name
             email (str): Email address
-            license_number (str): Driver license number
             line_num (int): Line number in the file
         """
         # Check if email already exists
@@ -214,18 +233,17 @@ class BulkLoadProcessor:
             self._log_result(line_num, 'D', 'Failed', f'{first_name} {last_name} ({email})', f'Email already exists: {email}')
             return
             
-        # Check if the sponsor organization exists
-        sponsor = Sponsor.query.filter_by(ORG_NAME=org_name).first()
-        if not sponsor:
+        # Check if the organization exists
+        existing_org = Organization.query.filter_by(ORG_NAME=org_name).first()
+        if not existing_org:
             self.results['failed'] += 1
-            self._log_result(line_num, 'D', 'Failed', f'{first_name} {last_name} ({email})', f'Sponsor organization not found: {org_name}')
+            self._log_result(line_num, 'D', 'Failed', f'{first_name} {last_name} ({email})', f'Organization not found: {org_name}. Please create the organization first using an O record.')
             return
-            
         try:
             # Generate a unique username
             username = self._generate_unique_username(first_name, last_name)
             
-            # Create the user
+            # Create the user (let USER_CODE auto-increment)
             new_user = User(
                 USERNAME=username,
                 USER_TYPE=Role.DRIVER,
@@ -233,6 +251,9 @@ class BulkLoadProcessor:
                 LNAME=last_name,
                 EMAIL=email,
                 CREATED_AT=datetime.now(),
+                POINTS=0,
+                wants_point_notifications=True,
+                wants_order_notifications=True,
                 IS_ACTIVE=1,
                 FAILED_ATTEMPTS=0,
                 IS_LOCKED_OUT=0
@@ -242,30 +263,20 @@ class BulkLoadProcessor:
             password = new_user.admin_set_new_pass()
             
             db.session.add(new_user)
-            db.session.flush()  # Get the user ID
+            db.session.commit()  # Commit the user first to get the auto-generated USER_CODE
             
-            # Create the driver
+            # Create the driver (license number will be added separately later)
             new_driver = Driver(
                 DRIVER_ID=new_user.USER_CODE,
-                LICENSE_NUMBER=license_number
+                LICENSE_NUMBER="PENDING"  # Placeholder - to be updated later
             )
             
             db.session.add(new_driver)
-            
-            # Create a driver application to the sponsor
-            from models import DriverApplication
-            application = DriverApplication(
-                DRIVER_ID=new_user.USER_CODE,
-                SPONSOR_ID=sponsor.SPONSOR_ID,
-                STATUS="Pending"
-            )
-            db.session.add(application)
-            
             db.session.commit()
             
             # Log the event
             self._log_audit_event(new_user.USER_CODE, 'driver_created_via_bulk_load', 
-                                 f'Created driver: {first_name} {last_name}, Applied to sponsor: {org_name}')
+                                 f'Created driver: {first_name} {last_name} for organization: {org_name}')
             
             self.results['success'] += 1
             self.results['drivers_created'] += 1
@@ -274,6 +285,44 @@ class BulkLoadProcessor:
             db.session.rollback()
             self.results['failed'] += 1
             self._log_result(line_num, 'D', 'Failed', f'{first_name} {last_name} ({email})', f'Database error: {str(e)}')
+            raise e
+    
+    def _create_organization(self, org_name, line_num):
+        """
+        Create an organization record in the database
+        
+        Args:
+            org_name (str): Organization name
+            line_num (int): Line number in the file
+        """
+        # Check if organization already exists
+        existing_org = Organization.query.filter_by(ORG_NAME=org_name).first()
+        if existing_org:
+            self.results['failed'] += 1
+            self._log_result(line_num, 'O', 'Failed', org_name, f'Organization already exists: {org_name}')
+            return
+        
+        try:
+            # Create new organization
+            new_org = Organization(
+                ORG_NAME=org_name,
+                CREATED_AT=datetime.now()
+            )
+            
+            db.session.add(new_org)
+            db.session.commit()
+            
+            self.results['success'] += 1
+            self.results['organizations_created'] += 1
+            self._log_result(line_num, 'O', 'Success', org_name, f'Organization "{org_name}" created successfully (ID: {new_org.ORG_ID})')
+            
+            # Log the event
+            self._log_audit_event(0, 'organization_created_via_bulk_load', f'Created organization: {org_name} (ID: {new_org.ORG_ID})')
+            
+        except Exception as e:
+            db.session.rollback()
+            self.results['failed'] += 1
+            self._log_result(line_num, 'O', 'Failed', org_name, f'Database error creating organization: {str(e)}')
             raise e
     
     def _generate_unique_username(self, first_name, last_name):

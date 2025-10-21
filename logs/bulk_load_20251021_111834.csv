@@ -1,0 +1,9 @@
+Line Number,Record Type,Status,Details,Error
+1,O,Failed,New Organization,Organization already exists: New Organization
+2,D,Failed,Joe Driver (me@email.com),Sponsor not found for organization: New Organization. Please create a sponsor for this organization first.
+3,S,Failed,Jill Sponsor (jill@mail.com),Database error: 'Bcrypt' object has no attribute 'hashpw'
+3,S,Failed,"['S', 'New Organization', 'Jill', 'Sponsor', 'jill@mail.com']",'Bcrypt' object has no attribute 'hashpw'
+4,D,Failed,"['D', 'This is', 'AN ERROR', 'x@y.com']",Insufficient data for driver record. Format: D|Organization|FirstName|LastName|Email
+5,D,Failed,Tom Smith (tom887@gmail.com),Sponsor not found for organization: Existing Organization. Please create a sponsor for this organization first.
+6,O,Failed,NewOrganization2,Organization already exists: NewOrganization2
+7,D,Failed,New Driver (some@email.com),Sponsor not found for organization: Existing Organization. Please create a sponsor for this organization first.

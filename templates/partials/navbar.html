@@ -54,9 +54,21 @@
               <span class="slider"></span>
             </label>
           </div>
+          <a href="{{ url_for('auth.settings') }}">Settings</a>
           <a href="{{ url_for('auth.logout') }}">Logout</a>
         </div>
       </span>
+      {% if g.is_impersonating %}
+        <div class="impersonation-banner" role="status" aria-live="polite">
+          <form method="POST" action="{{ url_for('impersonation_bp.stop_impersonation') }}" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-danger small" title="Stop impersonation">
+              Stop impersonating ({{ g.impersonator.USERNAME if g.impersonator else 'you' }})
+            </button>
+          </form>
+          <span class="impersonation-target">Viewing as {{ current_user.USERNAME }}</span>
+        </div>
+      {% endif %}
     {% else %}
       <a class="btn-primary" href="{{ url_for('auth.login') }}">Login</a>
     {% endif %}

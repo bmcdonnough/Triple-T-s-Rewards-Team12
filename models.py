@@ -7,6 +7,8 @@ from english_words import english_words_set
 import random
 import string
 from flask_login import UserMixin
+import pyotp
+from itsdangerous import URLSafeTimedSerializer
 
 LOCKOUT_ATTEMPTS = 3
 WORDS = list(english_words_set)
@@ -52,6 +54,8 @@ class User(db.Model, UserMixin):
     LOCKED_REASON = db.Column(db.String(100), nullable=True)
     wants_point_notifications = db.Column(db.Boolean, default=True, nullable=False)
     wants_order_notifications = db.Column(db.Boolean, default=True, nullable=False)
+    TOTP_SECRET = db.Column(db.String(16), nullable=True)
+    TOTP_ENABLED = db.Column(db.Boolean, default=False, nullable=False)
     addresses = db.relationship('Address', backref='user', lazy=True, cascade="all, delete-orphan")
     wishlist_items = db.relationship('WishlistItem', backref='user', lazy=True, cascade="all, delete-orphan")
     sponsor = db.relationship('Sponsor', backref='user', uselist=False, cascade="all, delete-orphan")
@@ -93,6 +97,12 @@ class User(db.Model, UserMixin):
             self.IS_LOCKED_OUT = 1
             return True
         return False
+    
+    def get_totp_uri(self):
+        return f'otpauth://totp/TripleTRewards:{self.USERNAME}?secret={self.TOTP_SECRET}&issuer=TripleTRewards'
+    
+    def get_totp(self):
+        return pyotp.TOTP(self.TOTP_SECRET)
     
     def register_failed_attempt(self):
         self.FAILED_ATTEMPTS += 1
@@ -220,3 +230,11 @@ class Organization(db.Model):
     ORG_ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
     ORG_NAME = db.Column(db.String(100), unique=True, nullable=False)
     CREATED_AT = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+class ImpersonationLog(db.Model):
+    __tablename__ = 'IMPERSONATION_LOG'
+    id = db.Column(db.Integer, primary_key=True)
+    actor_id = db.Column(db.Integer, db.ForeignKey('USERS.USER_CODE'), nullable=False)
+    target_id = db.Column(db.Integer, db.ForeignKey('USERS.USER_CODE'), nullable=False)
+    action = db.Column(db.String(20), nullable=False)  # 'start' or 'stop'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)

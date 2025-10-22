@@ -1,18 +1,77 @@
 # auth/routes.py
+import base64
+from io import BytesIO
 from urllib.parse import urlparse, urljoin
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
+import pyotp
+import qrcode
+import auth
 from models import User, Role  # Role has DRIVER, SPONSOR, ADMINISTRATOR
 from datetime import datetime, timedelta
 from extensions import db
 from sqlalchemy import or_
 from common.logging import log_audit_event, LOGIN_EVENT
+from . import auth_bp
 
 auth_bp = Blueprint("auth", __name__, template_folder="../templates")
 
 
 LOCKOUT_ATTEMPTS = 3
 RESET_TOKEN_TTL_MINUTES = 30
+
+
+
+@auth_bp.route('/settings')
+@login_required
+def settings():
+    return render_template('auth/settings.html')
+
+
+@auth_bp.route("/twofa/setup", methods=["GET"])
+@login_required
+def twofa_setup():
+    if not current_user.TOTP_SECRET:
+        current_user.TOTP_SECRET = pyotp.random_base32()
+        from extensions import db
+        db.session.commit()
+
+    uri = f"otpauth://totp/TripleTsRewards:{current_user.USERNAME}?secret={current_user.TOTP_SECRET}&issuer=TripleTsRewards"
+    img = qrcode.make(uri)
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    qr_data_url = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    return render_template("auth/setup_2fa.html", qr_data_url=qr_data_url, secret=current_user.TOTP_SECRET)
+
+
+def dashboard_endpoint_redirect(user) -> str:
+    mapping = {
+        Role.ADMINISTRATOR: "administrator_bp.dashboard",
+        Role.SPONSOR: "sponsor_bp.dashboard",
+        Role.DRIVER: "driver_bp.dashboard",
+    }
+    return mapping.get(user.USER_TYPE, "common.index")
+# auth/routes.py
+@auth_bp.route("/twofa/verify", methods=["POST"])
+@login_required
+def twofa_verify():
+    token = (request.form.get("token") or "").strip()
+    if not current_user.TOTP_SECRET:
+        flash("No 2FA setup in progress.", "warning")
+        return redirect(url_for("auth.twofa_setup"))
+
+    totp = pyotp.TOTP(current_user.TOTP_SECRET)
+    if totp.verify(token, valid_window=1):
+        current_user.TOTP_ENABLED = True  # if you added this column
+        from extensions import db
+        db.session.commit()
+        endpoint_redirect = dashboard_endpoint_redirect(current_user)
+        flash("Two-factor authentication is enabled.", "success")
+        return redirect(url_for(endpoint_redirect))  # Whatever your dashboard is
+    else:
+        flash("Invalid code. Please try again.", "danger")
+        return redirect(url_for("auth.twofa_setup"))
 
 def _is_safe_url(target: str) -> bool:
     ref = urlparse(request.host_url)

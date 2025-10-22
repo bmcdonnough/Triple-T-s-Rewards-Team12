@@ -41,7 +41,7 @@ class AboutInfo(db.Model):
 class User(db.Model, UserMixin):
     __tablename__ = 'USERS'
     #User PI
-    USER_CODE = db.Column(db.Integer, primary_key=True)
+    USER_CODE = db.Column(db.Integer, primary_key=True, autoincrement=True)
     USERNAME = db.Column(db.String(50), unique=True, nullable=False)
     PASS = db.Column(db.String(255), nullable=True)  
     USER_TYPE = db.Column(db.String(20), nullable=False)
@@ -58,6 +58,7 @@ class User(db.Model, UserMixin):
     TOTP_ENABLED = db.Column(db.Boolean, default=False, nullable=False)
     addresses = db.relationship('Address', backref='user', lazy=True, cascade="all, delete-orphan")
     wishlist_items = db.relationship('WishlistItem', backref='user', lazy=True, cascade="all, delete-orphan")
+    sponsor = db.relationship('Sponsor', backref='user', uselist=False, cascade="all, delete-orphan")
 
     #User account
     IS_ACTIVE = db.Column(db.Integer, nullable=False)
@@ -82,7 +83,7 @@ class User(db.Model, UserMixin):
         numbers = ''.join(secrets.choice(string.digits) for _ in range(num_digits))
         password = word + numbers
         
-        self.PASS = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        self.PASS = bcrypt.generate_password_hash(password).decode('utf-8')
         
         return password
 
@@ -224,6 +225,12 @@ class WishlistItem(db.Model):
     points = db.Column(db.Integer, nullable=False)
     image_url = db.Column(db.String(255), nullable=True)
 
+class Organization(db.Model):
+    __tablename__ = 'ORGANIZATIONS'
+    ORG_ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    ORG_NAME = db.Column(db.String(100), unique=True, nullable=False)
+    CREATED_AT = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
 class ImpersonationLog(db.Model):
     __tablename__ = 'IMPERSONATION_LOG'
     id = db.Column(db.Integer, primary_key=True)

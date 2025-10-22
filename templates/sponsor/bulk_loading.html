@@ -12,7 +12,7 @@
             <li>You can only create <strong>Drivers (D)</strong> and <strong>Sponsors (S)</strong></li>
             <li>You cannot create Organizations (O) - only administrators can do this</li>
             <li>All users created will be associated with your organization: <strong>{{ current_user.sponsor.ORG_NAME if current_user.sponsor else 'Unknown' }}</strong></li>
-            <li>Only one sponsor per organization is allowed</li>
+            <li>Multiple sponsors per organization are allowed</li>
         </ul>
     </div>
 
@@ -72,37 +72,6 @@
 
     {% if results %}
     <div class="card mt-4">
-        <div class="card-header">
-            <h4>Processing Results</h4>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-3">
-                    <div class="text-center">
-                        <h5>{{ results.total }}</h5>
-                        <p class="text-muted">Total Records</p>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="text-center">
-                        <h5 class="text-success">{{ results.success }}</h5>
-                        <p class="text-muted">Successful</p>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="text-center">
-                        <h5 class="text-danger">{{ results.failed }}</h5>
-                        <p class="text-muted">Failed</p>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="text-center">
-                        <h5 class="text-info">{{ results.sponsors_created + results.drivers_created }}</h5>
-                        <p class="text-muted">Users Created</p>
-                    </div>
-                </div>
-            </div>
-            
             {% if results.log_entries %}
             <div class="mt-4">
                 <h5>Processing Log</h5>
@@ -137,7 +106,7 @@
     {% endif %}
 
     <div class="mt-4">
-        <a href="{{ url_for('sponsor.dashboard') }}" class="btn btn-outline-secondary">Back to Dashboard</a>
+        <a href="{{ url_for('sponsor_bp.dashboard') }}" class="btn btn-outline-secondary">Back to Dashboard</a>
         <a href="{{ url_for('bulk_loading_bp.view_logs') }}" class="btn btn-outline-info">View All Logs</a>
     </div>
 </div>

@@ -145,23 +145,35 @@ class BulkLoadProcessor:
             
         elif record_type == 'S':
             # Create sponsor - sponsors can create other sponsors in their own organization
-            if len(data) >= 4:  # S|FirstName|LastName|Email (no org name needed, uses sponsor's org)
-                first_name, last_name, email = data[1], data[2], data[3]
+            # Format can be: S|FirstName|LastName|Email OR S||FirstName|LastName|Email (with empty org field)
+            if len(data) >= 4:
+                if len(data) == 4:
+                    # S|FirstName|LastName|Email
+                    first_name, last_name, email = data[1], data[2], data[3]
+                else:
+                    # S||FirstName|LastName|Email (skip empty org field)
+                    first_name, last_name, email = data[2], data[3], data[4]
                 self._create_sponsor_by_sponsor(first_name, last_name, email, line_num)
             else:
                 self.results['failed'] += 1
                 self._log_result(line_num, record_type, 'Failed', str(data), 
-                               'Insufficient data for sponsor record. Format: S|FirstName|LastName|Email')
+                               'Insufficient data for sponsor record. Format: S|FirstName|LastName|Email or S||FirstName|LastName|Email')
                 
         elif record_type == 'D':
-            # Create driver - sponsors can create drivers for their organization
-            if len(data) >= 4:  # D|FirstName|LastName|Email (no org name needed, uses sponsor's org)
-                first_name, last_name, email = data[1], data[2], data[3]
+            # Create driver - sponsors can create drivers for their organization  
+            # Format can be: D|FirstName|LastName|Email OR D||FirstName|LastName|Email (with empty org field)
+            if len(data) >= 4:
+                if len(data) == 4:
+                    # D|FirstName|LastName|Email
+                    first_name, last_name, email = data[1], data[2], data[3]
+                else:
+                    # D||FirstName|LastName|Email (skip empty org field)
+                    first_name, last_name, email = data[2], data[3], data[4]
                 self._create_driver_by_sponsor(first_name, last_name, email, line_num)
             else:
                 self.results['failed'] += 1
                 self._log_result(line_num, record_type, 'Failed', str(data), 
-                               'Insufficient data for driver record. Format: D|FirstName|LastName|Email')
+                               'Insufficient data for driver record. Format: D|FirstName|LastName|Email or D||FirstName|LastName|Email')
                 
         else:
             self.results['failed'] += 1
@@ -192,12 +204,7 @@ class BulkLoadProcessor:
             self._log_result(line_num, 'S', 'Failed', f'{first_name} {last_name} ({email})', f'Organization not found: {org_name}. Please create the organization first using an O record.')
             return
             
-        # Check if there's already a sponsor for this organization
-        existing_sponsor = Sponsor.query.filter_by(ORG_NAME=org_name).first()
-        if existing_sponsor:
-            self.results['failed'] += 1
-            self._log_result(line_num, 'S', 'Failed', f'{first_name} {last_name} ({email})', f'Sponsor already exists for organization: {org_name}')
-            return
+        # Multiple sponsors per organization are now allowed - no restriction needed
         
         try:
             # Generate a unique username
@@ -423,16 +430,7 @@ class BulkLoadProcessor:
                            f'Email already exists: {email}')
             return
             
-        # Check if there's already another sponsor for this organization
-        existing_sponsor = Sponsor.query.filter(
-            Sponsor.ORG_NAME == org_name,
-            Sponsor.SPONSOR_ID != current_user.USER_CODE
-        ).first()
-        if existing_sponsor:
-            self.results['failed'] += 1
-            self._log_result(line_num, 'S', 'Failed', f'{first_name} {last_name} ({email})', 
-                           f'Another sponsor already exists for organization: {org_name}')
-            return
+        # Multiple sponsors per organization are now allowed - no need to check for existing sponsors
         
         try:
             # Generate a unique username

@@ -27,20 +27,12 @@ def admin_bulk_loading():
             return redirect(request.url)
             
         if file and _allowed_file(file.filename):
-            # Create uploads directory if it doesn't exist
-            uploads_dir = os.path.join(current_app.root_path, 'uploads')
-            if not os.path.exists(uploads_dir):
-                os.makedirs(uploads_dir)
-                
-            # Save the file with timestamp to prevent overwriting
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f"{timestamp}_{secure_filename(file.filename)}"
-            file_path = os.path.join(uploads_dir, filename)
-            file.save(file_path)
-            
             try:
-                # Process the file
-                processor = BulkLoadProcessor(file_path, mode='admin')
+                # Read file content directly from memory without saving to disk
+                file_content = file.read().decode('utf-8')
+                
+                # Process the file content directly
+                processor = BulkLoadProcessor(file_content=file_content, mode='admin')
                 results = processor.process_file()
                 
                 # Log the event
@@ -54,13 +46,8 @@ def admin_bulk_loading():
                       f"Failed: {results['failed']}, Organizations: {results['organizations_created']}, "
                       f"Sponsors created: {results['sponsors_created']}, Drivers created: {results['drivers_created']}", 'success')
                 
-                # Save log file path for download
-                log_file_path = processor.log_file_path
-                log_filename = os.path.basename(log_file_path)
-                
                 return render_template('administrator/bulk_loading.html', 
-                                     results=results, 
-                                     log_filename=log_filename)
+                                     results=results)
             except Exception as e:
                 flash(f"Error processing file: {str(e)}", 'danger')
                 return redirect(request.url)
@@ -70,14 +57,20 @@ def admin_bulk_loading():
             
     return render_template('administrator/bulk_loading.html')
 
-@bulk_loading_bp.route('/download-log/<filename>')
+# Log download functionality removed - logs are now stored in AUDIT_LOG table
+
+@bulk_loading_bp.route('/view-logs')
 @role_required(Role.ADMINISTRATOR, redirect_to='auth.login')
-def download_log(filename):
+def view_logs():
     """
-    Download log file
+    View bulk loading audit logs
     """
-    logs_dir = os.path.join(current_app.root_path, 'logs')
-    return send_from_directory(logs_dir, filename, as_attachment=True)
+    # Get all bulk loading related audit logs
+    logs = AuditLog.query.filter(
+        AuditLog.EVENT_TYPE.like('bulk_load%')
+    ).order_by(AuditLog.CREATED_AT.desc()).limit(100).all()
+    
+    return render_template('administrator/bulk_loading_logs.html', logs=logs)
 
 @bulk_loading_bp.route('/download-template')
 @role_required(Role.ADMINISTRATOR, Role.SPONSOR, redirect_to='auth.login')

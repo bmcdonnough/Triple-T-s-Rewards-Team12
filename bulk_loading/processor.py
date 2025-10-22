@@ -1,5 +1,4 @@
 import os
-import csv
 from datetime import datetime
 from flask import current_app
 from models import db, User, Sponsor, Driver, Role, AuditLog, Organization
@@ -9,14 +8,16 @@ class BulkLoadProcessor:
     Processes bulk loading files for the Triple-T's Rewards system
     """
     
-    def __init__(self, file_path, mode='admin'):
+    def __init__(self, file_content=None, file_path=None, mode='admin'):
         """
         Initialize the bulk loading processor
         
         Args:
-            file_path (str): Path to the bulk loading file
+            file_content (str): Content of the file (for in-memory processing)
+            file_path (str): Path to the bulk loading file (for file-based processing)
             mode (str): 'admin' or 'sponsor' mode
         """
+        self.file_content = file_content
         self.file_path = file_path
         self.mode = mode
         self.log_file = None
@@ -26,20 +27,12 @@ class BulkLoadProcessor:
             'failed': 0,
             'organizations_created': 0,
             'sponsors_created': 0,
-            'drivers_created': 0
+            'drivers_created': 0,
+            'log_entries': []  # Store log entries for display
         }
         
-        # Create log directory if it doesn't exist
-        logs_dir = os.path.join(current_app.root_path, 'logs')
-        if not os.path.exists(logs_dir):
-            os.makedirs(logs_dir)
-            
-        # Create log file
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.log_file_path = os.path.join(logs_dir, f'bulk_load_{timestamp}.csv')
-        self.log_file = open(self.log_file_path, 'w', newline='')
-        self.csv_writer = csv.writer(self.log_file)
-        self.csv_writer.writerow(['Line Number', 'Record Type', 'Status', 'Details', 'Error'])
+        # Generate a unique session ID for this bulk load operation
+        self.session_id = datetime.now().strftime('%Y%m%d_%H%M%S')
     
     def process_file(self):
         """
@@ -49,8 +42,13 @@ class BulkLoadProcessor:
             dict: Results of the processing
         """
         try:
-            with open(self.file_path, 'r') as file:
-                lines = file.readlines()
+            if self.file_content:
+                # Process from memory (file content)
+                lines = self.file_content.splitlines()
+            else:
+                # Process from file path (backwards compatibility)
+                with open(self.file_path, 'r') as file:
+                    lines = file.readlines()
                 
             for line_num, line in enumerate(lines, 1):
                 if not line.strip():
@@ -73,14 +71,18 @@ class BulkLoadProcessor:
                     self._log_result(line_num, record_type, 'Failed', str(data), str(e))
                     db.session.rollback()
                     
-            # Close the log file
-            if self.log_file:
-                self.log_file.close()
+            # Log the completion of bulk load operation
+            self._log_audit_event(0, 'bulk_load_completed', 
+                                 f'Bulk load session {self.session_id} completed. '
+                                 f'Total: {self.results["total"]}, Success: {self.results["success"]}, '
+                                 f'Failed: {self.results["failed"]}, Organizations: {self.results["organizations_created"]}, '
+                                 f'Sponsors: {self.results["sponsors_created"]}, Drivers: {self.results["drivers_created"]}')
                 
             return self.results
         except Exception as e:
-            if self.log_file:
-                self.log_file.close()
+            # Log the error in the audit log
+            self._log_audit_event(0, 'bulk_load_error', 
+                                 f'Bulk load session {self.session_id} failed with error: {str(e)}')
             raise e
     
     def _process_admin_record(self, record_type, data, line_num):
@@ -363,7 +365,7 @@ class BulkLoadProcessor:
     
     def _log_result(self, line_num, record_type, status, details, message):
         """
-        Log a result to the CSV file
+        Log a result to the audit log database
         
         Args:
             line_num (int): Line number in the file
@@ -372,8 +374,21 @@ class BulkLoadProcessor:
             details (str): Record details
             message (str): Additional message
         """
-        if self.csv_writer:
-            self.csv_writer.writerow([line_num, record_type, status, details, message])
+        # Create audit log entry
+        event_type = f'bulk_load_{record_type.lower()}_{status.lower()}'
+        log_details = f'Session: {self.session_id}, Line: {line_num}, Type: {record_type}, Details: {details}, Message: {message}'
+        
+        self._log_audit_event(0, event_type, log_details)
+        
+        # Also store in results for display purposes
+        log_entry = {
+            'line_num': line_num,
+            'record_type': record_type,
+            'status': status,
+            'details': details,
+            'message': message
+        }
+        self.results['log_entries'].append(log_entry)
     
     def _log_audit_event(self, user_id, event_type, details):
         """
@@ -384,10 +399,15 @@ class BulkLoadProcessor:
             event_type (str): Type of event
             details (str): Event details
         """
-        log_entry = AuditLog(
-            EVENT_TYPE=event_type,
-            DETAILS=details,
-            CREATED_AT=datetime.now()
-        )
-        db.session.add(log_entry)
-        # No commit needed here as it's part of a larger transaction
+        try:
+            log_entry = AuditLog(
+                EVENT_TYPE=event_type,
+                DETAILS=details,
+                CREATED_AT=datetime.now()
+            )
+            db.session.add(log_entry)
+            db.session.commit()  # Commit immediately for audit logging
+        except Exception as e:
+            # If audit logging fails, we still want the main process to continue
+            db.session.rollback()
+            print(f"Warning: Failed to log audit event: {str(e)}")

@@ -1,9 +1,0 @@
-Line Number,Record Type,Status,Details,Error
-1,O,Success,New Organization,"Organization ""New Organization"" created successfully (ID: 2)"
-2,D,Failed,"['D', 'New Organization', 'Joe', 'Driver', 'me@email.com']",Insufficient data for driver record
-3,S,Failed,Jill Sponsor (jill@mail.com),Database error: 'Bcrypt' object has no attribute 'hashpw'
-3,S,Failed,"['S', 'New Organization', 'Jill', 'Sponsor', 'jill@mail.com']",'Bcrypt' object has no attribute 'hashpw'
-4,D,Failed,"['D', 'This is', 'AN ERROR', 'x@y.com']",Insufficient data for driver record
-5,D,Failed,"['D', 'Existing Organization', 'Tom', 'Smith', 'tom887@gmail.com']",Insufficient data for driver record
-6,O,Success,NewOrganization2,"Organization ""NewOrganization2"" created successfully (ID: 3)"
-7,D,Failed,"['D', 'Existing Organization', 'New', 'Driver', 'some@email.com']",Insufficient data for driver record

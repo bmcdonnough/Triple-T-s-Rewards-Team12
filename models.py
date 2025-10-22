@@ -54,6 +54,7 @@ class User(db.Model, UserMixin):
     wants_order_notifications = db.Column(db.Boolean, default=True, nullable=False)
     addresses = db.relationship('Address', backref='user', lazy=True, cascade="all, delete-orphan")
     wishlist_items = db.relationship('WishlistItem', backref='user', lazy=True, cascade="all, delete-orphan")
+    sponsor = db.relationship('Sponsor', backref='user', uselist=False, cascade="all, delete-orphan")
 
     #User account
     IS_ACTIVE = db.Column(db.Integer, nullable=False)

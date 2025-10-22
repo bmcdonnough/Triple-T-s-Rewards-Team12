@@ -128,14 +128,44 @@ class BulkLoadProcessor:
     def _process_sponsor_record(self, record_type, data, line_num):
         """
         Process a record in sponsor mode
+        Sponsors can only create drivers (D) and other sponsors (S)
+        They cannot create organizations (O)
         
         Args:
-            record_type (str): Type of record ('D')
+            record_type (str): Type of record ('D' or 'S')
             data (list): Record data
             line_num (int): Line number in the file
         """
-        # This will be implemented later for sponsor mode
-        pass
+        if record_type == 'O':
+            # Sponsors cannot create organizations
+            self.results['failed'] += 1
+            self._log_result(line_num, record_type, 'Failed', str(data), 
+                           'Access denied: Sponsors cannot create organizations. Only administrators can create organizations.')
+            return
+            
+        elif record_type == 'S':
+            # Create sponsor - sponsors can create other sponsors in their own organization
+            if len(data) >= 4:  # S|FirstName|LastName|Email (no org name needed, uses sponsor's org)
+                first_name, last_name, email = data[1], data[2], data[3]
+                self._create_sponsor_by_sponsor(first_name, last_name, email, line_num)
+            else:
+                self.results['failed'] += 1
+                self._log_result(line_num, record_type, 'Failed', str(data), 
+                               'Insufficient data for sponsor record. Format: S|FirstName|LastName|Email')
+                
+        elif record_type == 'D':
+            # Create driver - sponsors can create drivers for their organization
+            if len(data) >= 4:  # D|FirstName|LastName|Email (no org name needed, uses sponsor's org)
+                first_name, last_name, email = data[1], data[2], data[3]
+                self._create_driver_by_sponsor(first_name, last_name, email, line_num)
+            else:
+                self.results['failed'] += 1
+                self._log_result(line_num, record_type, 'Failed', str(data), 
+                               'Insufficient data for driver record. Format: D|FirstName|LastName|Email')
+                
+        else:
+            self.results['failed'] += 1
+            self._log_result(line_num, record_type, 'Failed', str(data), f'Unknown record type: {record_type}')
     
     def _create_sponsor(self, org_name, first_name, last_name, email, line_num):
         """
@@ -362,6 +392,178 @@ class BulkLoadProcessor:
                     break
         
         return username
+    
+    def _create_sponsor_by_sponsor(self, first_name, last_name, email, line_num):
+        """
+        Create a new sponsor user by another sponsor (same organization)
+        
+        Args:
+            first_name (str): First name
+            last_name (str): Last name
+            email (str): Email address
+            line_num (int): Line number in the file
+        """
+        from flask_login import current_user
+        
+        # Get the current sponsor's organization
+        current_sponsor = Sponsor.query.filter_by(SPONSOR_ID=current_user.USER_CODE).first()
+        if not current_sponsor:
+            self.results['failed'] += 1
+            self._log_result(line_num, 'S', 'Failed', f'{first_name} {last_name} ({email})', 
+                           'Current user is not a valid sponsor')
+            return
+            
+        org_name = current_sponsor.ORG_NAME
+        
+        # Check if email already exists
+        existing_user = User.query.filter_by(EMAIL=email).first()
+        if existing_user:
+            self.results['failed'] += 1
+            self._log_result(line_num, 'S', 'Failed', f'{first_name} {last_name} ({email})', 
+                           f'Email already exists: {email}')
+            return
+            
+        # Check if there's already another sponsor for this organization
+        existing_sponsor = Sponsor.query.filter(
+            Sponsor.ORG_NAME == org_name,
+            Sponsor.SPONSOR_ID != current_user.USER_CODE
+        ).first()
+        if existing_sponsor:
+            self.results['failed'] += 1
+            self._log_result(line_num, 'S', 'Failed', f'{first_name} {last_name} ({email})', 
+                           f'Another sponsor already exists for organization: {org_name}')
+            return
+        
+        try:
+            # Generate a unique username
+            username = self._generate_unique_username(first_name, last_name)
+            
+            # Create the user
+            new_user = User(
+                USERNAME=username,
+                USER_TYPE=Role.SPONSOR,
+                FNAME=first_name,
+                LNAME=last_name,
+                EMAIL=email,
+                CREATED_AT=datetime.now(),
+                POINTS=0,
+                wants_point_notifications=True,
+                wants_order_notifications=True,
+                IS_ACTIVE=1,
+                FAILED_ATTEMPTS=0,
+                IS_LOCKED_OUT=0
+            )
+            
+            # Generate a random password
+            password = new_user.admin_set_new_pass()
+            
+            db.session.add(new_user)
+            db.session.commit()
+            
+            # Create the sponsor
+            new_sponsor = Sponsor(
+                SPONSOR_ID=new_user.USER_CODE,
+                ORG_NAME=org_name,
+                STATUS="Pending"
+            )
+            
+            db.session.add(new_sponsor)
+            db.session.commit()
+            
+            # Log the event
+            self._log_audit_event(new_user.USER_CODE, 'sponsor_created_by_sponsor', 
+                                 f'Sponsor {current_user.USERNAME} created new sponsor: {first_name} {last_name}, Org: {org_name}')
+            
+            self.results['success'] += 1
+            self.results['sponsors_created'] += 1
+            self._log_result(line_num, 'S', 'Success', f'{first_name} {last_name} ({email})', 
+                           f'Username: {username}, Password: {password}')
+        except Exception as e:
+            db.session.rollback()
+            self.results['failed'] += 1
+            self._log_result(line_num, 'S', 'Failed', f'{first_name} {last_name} ({email})', 
+                           f'Database error: {str(e)}')
+            raise e
+    
+    def _create_driver_by_sponsor(self, first_name, last_name, email, line_num):
+        """
+        Create a new driver user by a sponsor
+        
+        Args:
+            first_name (str): First name
+            last_name (str): Last name
+            email (str): Email address
+            line_num (int): Line number in the file
+        """
+        from flask_login import current_user
+        
+        # Get the current sponsor's organization
+        current_sponsor = Sponsor.query.filter_by(SPONSOR_ID=current_user.USER_CODE).first()
+        if not current_sponsor:
+            self.results['failed'] += 1
+            self._log_result(line_num, 'D', 'Failed', f'{first_name} {last_name} ({email})', 
+                           'Current user is not a valid sponsor')
+            return
+            
+        org_name = current_sponsor.ORG_NAME
+        
+        # Check if email already exists
+        existing_user = User.query.filter_by(EMAIL=email).first()
+        if existing_user:
+            self.results['failed'] += 1
+            self._log_result(line_num, 'D', 'Failed', f'{first_name} {last_name} ({email})', 
+                           f'Email already exists: {email}')
+            return
+            
+        try:
+            # Generate a unique username
+            username = self._generate_unique_username(first_name, last_name)
+            
+            # Create the user
+            new_user = User(
+                USERNAME=username,
+                USER_TYPE=Role.DRIVER,
+                FNAME=first_name,
+                LNAME=last_name,
+                EMAIL=email,
+                CREATED_AT=datetime.now(),
+                POINTS=0,
+                wants_point_notifications=True,
+                wants_order_notifications=True,
+                IS_ACTIVE=1,
+                FAILED_ATTEMPTS=0,
+                IS_LOCKED_OUT=0
+            )
+            
+            # Generate a random password
+            password = new_user.admin_set_new_pass()
+            
+            db.session.add(new_user)
+            db.session.commit()
+            
+            # Create the driver
+            new_driver = Driver(
+                DRIVER_ID=new_user.USER_CODE,
+                LICENSE_NUMBER="PENDING"  # Placeholder - to be updated later
+            )
+            
+            db.session.add(new_driver)
+            db.session.commit()
+            
+            # Log the event
+            self._log_audit_event(new_user.USER_CODE, 'driver_created_by_sponsor', 
+                                 f'Sponsor {current_user.USERNAME} created driver: {first_name} {last_name} for organization: {org_name}')
+            
+            self.results['success'] += 1
+            self.results['drivers_created'] += 1
+            self._log_result(line_num, 'D', 'Success', f'{first_name} {last_name} ({email})', 
+                           f'Username: {username}, Password: {password}')
+        except Exception as e:
+            db.session.rollback()
+            self.results['failed'] += 1
+            self._log_result(line_num, 'D', 'Failed', f'{first_name} {last_name} ({email})', 
+                           f'Database error: {str(e)}')
+            raise e
     
     def _log_result(self, line_num, record_type, status, details, message):
         """

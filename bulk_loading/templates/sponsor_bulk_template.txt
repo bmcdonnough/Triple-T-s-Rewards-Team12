@@ -1,9 +1,15 @@
-D||First Name|Last Name|Email Address|License Number
+# Sponsor Bulk Loading Template
+# Sponsors can create Drivers (D) and other Sponsors (S) for their organization
+# Organization names are not needed - all users will be created under your organization
 
 # Format descriptions:
-# D||First Name|Last Name|Email Address|License Number
-# - Create a driver user and link to your organization
-# - The second field (organization) is left empty because the system will use your organization
+# S|First Name|Last Name|Email Address
+# - Create a sponsor user for your organization (only one sponsor allowed per organization)
 
-# Example:
-# D||John|Doe|john.doe@gmail.com|DL123456789
+# D|First Name|Last Name|Email Address  
+# - Create a driver user for your organization
+
+# Examples:
+# S|Jane|Smith|jane.smith@company.com
+# D|John|Doe|john.doe@company.com
+# D|Alice|Johnson|alice.johnson@company.com

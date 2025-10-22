@@ -245,7 +245,7 @@ def add_user():
             CREATED_AT=datetime.now(),
             IS_ACTIVE=1
         )
-        new_pass = new_user.set_password()
+        new_pass = new_user.admin_set_new_pass()
 
         flash_message = (
         f"🚨 **TEMPORARY PASSWORD FOR TESTING:** `{new_pass}`. "

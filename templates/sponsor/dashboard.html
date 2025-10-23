@@ -12,11 +12,13 @@
     {% endwith %}
 
     <div class="dashboard-links">
-      <a href="{{ url_for('sponsor_bp.manage_points_page') }}" class="btn btn-primary">Award / Remove Points</a>
-      <a href="{{ url_for('sponsor_bp.driver_management') }}" class="btn btn-primary">Driver Management</a>
-      <a href="{{ url_for('sponsor_bp.review_driver_applications') }}" class="btn btn-primary">Review Applications</a>
-      <a href="{{ url_for('sponsor_bp.update_settings') }}" class="btn btn-primary">Store Settings</a>
-      <a href="{{ url_for('sponsor_bp.list_sponsor_users') }}" class="btn btn-primary">Sponsor Accounts</a>
+      <p><a href="{{ url_for('sponsor_bp.manage_points_page') }}" class="btn btn-primary">Award / Remove Points</a></p>
+      <p><a href="{{ url_for('sponsor_bp.driver_management') }}" class="btn btn-primary">Driver Management</a></p>
+      <p><a href="{{ url_for('sponsor_bp.review_driver_applications') }}" class="btn btn-primary">Review Applications</a></p>
+      <p><a href="{{ url_for('sponsor_bp.update_settings') }}" class="btn btn-primary">Store Settings</a></p>
+      <p><a href="{{ url_for('sponsor_bp.list_sponsor_users') }}" class="btn btn-primary">Sponsor Accounts</a></p>
+      <p><a href="{{ url_for('bulk_loading_bp.sponsor_bulk_loading') }}" class="btn btn-primary">Bulk Load Users</a></p>
+      <p><a href="{{ url_for('sponsor_bp.update_info') }}" class="btn btn-primary">Edit Account Info</a></p>
     </div>
 
     <div class="spacer"></div>

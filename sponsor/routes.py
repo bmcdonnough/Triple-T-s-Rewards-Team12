@@ -9,6 +9,7 @@ from models import User, Role, StoreSettings, db, DriverApplication, Sponsor, No
 from extensions import db
 import secrets
 import string
+import bcrypt
 
 # Blueprint for sponsor-related routes
 sponsor_bp = Blueprint('sponsor_bp', __name__, template_folder="../templates")
@@ -290,3 +291,90 @@ def driver_decision(app_id, decision):
     db.session.commit()
     flash(f"Driver application {decision}ed!", "info")
     return redirect(url_for("sponsor_bp.review_driver_applications"))
+
+# Update Contact Information
+@sponsor_bp.route('/update_info', methods=['GET', 'POST'])
+@role_required(Role.DRIVER, Role.SPONSOR, allow_admin=True, redirect_to='auth.login')
+def update_info():
+    from extensions import db
+    
+    sponsor = None
+    if current_user.USER_TYPE == "sponsor":
+        sponsor = Sponsor.query.get(current_user.USER_CODE)
+    
+    if request.method == 'POST':
+        email = request.form.get('email').strip()
+        phone = request.form.get('phone').strip()
+
+        # Basic email validation
+        if not email or '@' not in email:
+            flash('Please enter a valid email address.', 'danger')
+            return redirect(url_for('sponsor_bp.update_info'))
+            
+        # Check if email already exists for another user
+        if User.query.filter(User.EMAIL == email, User.USER_CODE != current_user.USER_CODE).first():
+            flash('Email already in use.', 'danger')
+            return redirect(url_for('sponsor_bp.update_info'))
+        
+        # Basic phone validation (optional)
+        if phone and (not phone.isdigit() or len(phone) < 10):
+            flash('Please enter a valid phone number.', 'danger')
+            return redirect(url_for('sponsor_bp.update_contact'))
+        
+        # Check if phone already exists for another user
+        if phone and User.query.filter(User.PHONE == phone, User.USER_CODE != current_user.USER_CODE).first():
+            flash('Phone number already in use.', 'danger')
+            return redirect(url_for('sponsor_bp.update_contact'))
+        
+        try:
+            current_user.EMAIL = email
+            current_user.PHONE = phone
+
+            db.session.commit()
+            flash('Contact information updated successfully!', 'success')
+            return redirect(url_for('sponsor_bp.dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while updating your information', 'danger')
+            return redirect(url_for('sponsor_bp.update_info'))
+
+    return render_template('sponsor/update_info.html', user=current_user, sponsor=sponsor)
+
+# Update Password
+@sponsor_bp.route('/change_password', methods=['GET', 'POST'])
+@role_required(Role.DRIVER, Role.SPONSOR, allow_admin=True, redirect_to='auth.login')
+def change_password():
+    from extensions import db
+
+    if request.method == 'POST':
+        current_password = request.form.get('current_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+
+        # Verify current password
+        if not bcrypt.check_password_hash(current_user.PASS, current_password):
+            flash('Current password is incorrect.', 'danger')
+            return redirect(url_for('sponsor_bp.change_password'))
+
+        # Validate new password
+        if new_password != confirm_password:
+            flash('New passwords do not match.', 'danger')
+            return redirect(url_for('sponsor_bp.change_password'))
+        
+        if len(new_password) < 8:
+            flash('Password must be at least 8 characters long.', 'danger')
+            return redirect(url_for('sponsor_bp.change_password'))
+        
+        # Update password and email
+        try:
+            hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+            current_user.PASS = hashed_password
+            db.session.commit()
+            flash('Information updated successfully!', 'success')
+            return redirect(url_for('sponsor_bp.dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while updating your information', 'danger')
+            return redirect(url_for('sponsor_bp.change_password'))
+
+    return render_template('sponsor/update_info.html', user=current_user)

@@ -7,16 +7,29 @@ def allowed_to_impersonate(target_user):
     """
     Determines if the current_user is allowed to impersonate the target_user.
     - Admins can impersonate anyone.
-    - Sponsors can impersonate drivers assigned to them.
+    - Sponsors can impersonate drivers they are associated with in DRIVER_SPONSOR_ASSOCIATIONS.
     """
     # Admins can impersonate anyone
-    if current_user.USER_TYPE == 'administrator':
+    if current_user.USER_TYPE.lower() in ['admin', 'administrator']:
         return True
 
     # Sponsors can impersonate their own drivers
-    if current_user.USER_TYPE == 'sponsor':
-        return getattr(target_user, 'USER_TYPE', None) == 'driver' and \
-               getattr(target_user, 'USER_CODE', None) == current_user.id
+    if current_user.USER_TYPE.lower() == 'sponsor':
+        target_type = getattr(target_user, 'USER_TYPE', '').lower()
+        if target_type != 'driver':
+            return False
+
+        # Check association between sponsor and driver
+        association = db.session.execute(
+            db.text("""
+                SELECT 1 FROM DRIVER_SPONSOR_ASSOCIATIONS
+                WHERE driver_id = :driver AND sponsor_id = :sponsor
+                LIMIT 1
+            """),
+            {'driver': target_user.USER_CODE, 'sponsor': current_user.USER_CODE}
+        ).fetchone()
+
+        return association is not None
 
     # Everyone else cannot impersonate
     return False

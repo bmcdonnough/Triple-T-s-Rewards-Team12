@@ -3,21 +3,22 @@
 {% block title %}My Notifications - TRIPLE T's Trucking Rewards{% endblock %}
 
 {% block content %}
+<section class="notifications-page container">
   <h1>Notifications</h1>
-  
+  <div class="list-actions">
+    <a href="{{ url_for('notification_bp.send_message') }}" class="btn btn-primary">
+      New Message
+    </a>
+  </div>
+
   <div class="notifications-container">
     {% if notifications %}
       {% for notification in notifications %}
-        
-        {# 
-          Check if READ_STATUS is False. 
-          If you used db.Boolean, False means Unread. 
-        #}
-        <div class="notification-item {% if not notification.READ_STATUS %}unread{% endif %}">
+        <div class="notification-item card {% if not notification.READ_STATUS %}unread{% endif %}">
           <div class="notification-header">
-            <span class="sender">From: 
+            <span class="sender">
+              From:
               <strong>
-                {# Access the sender's username via the 'sender' relationship #}
                 {% if notification.sender %}
                   {{ notification.sender.USERNAME }}
                 {% else %}
@@ -26,81 +27,20 @@
               </strong>
             </span>
             <span class="timestamp">
-              {# Format the TIMESTAMP column for a readable display #}
               {{ notification.TIMESTAMP.strftime('%b %d, %Y at %I:%M %p') }}
             </span>
           </div>
-          
-          <p class="message">
-            {# Display the MESSAGE column content #}
-            {{ notification.MESSAGE }}
-          </p>
+          <p class="message">{{ notification.MESSAGE }}</p>
         </div>
-        
       {% endfor %}
     {% else %}
-      <div class="no-notifications">
+      <div class="no-notifications card text-center">
         <p>You currently have no notifications.</p>
         <p>Keep up the great work to earn points and rewards! 🚚</p>
       </div>
     {% endif %}
   </div>
+</section>
 {% endblock %}
 
-{% block styles %}
-<style>
-  /* Basic styling for the notification list */
-  .notifications-container {
-    max-width: 800px;
-    margin: 20px auto;
-    padding: 10px;
-  }
-  
-  .notification-item {
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    padding: 15px;
-    margin-bottom: 10px;
-    background-color: #f9f9f9;
-    transition: background-color 0.3s;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  }
-  
-  /* Style for unread notifications */
-  .notification-item.unread {
-    background-color: #fff3cd; /* Light yellow/gold background */
-    border-left: 5px solid #ffc107; /* Highlight with a strong border */
-    font-weight: 500; /* Makes text slightly bolder without full bold */
-  }
-  
-  .notification-header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 5px;
-    font-size: 0.9em;
-  }
-  
-  .sender strong {
-    color: #1a1a1a;
-  }
-  
-  .timestamp {
-    color: #666;
-    font-size: 0.8em;
-  }
-  
-  .message {
-    margin: 0;
-    line-height: 1.4;
-    white-space: pre-wrap; /* Preserves formatting for multiline messages */
-  }
-  
-  .no-notifications {
-    text-align: center;
-    padding: 40px;
-    border: 1px dashed #ccc;
-    border-radius: 5px;
-    color: #888;
-  }
-</style>
-{% endblock %}
+{% block styles %}{% endblock %}

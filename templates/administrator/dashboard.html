@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
-  <h2>Administrator Dashboard (placeholder)</h2>
+  <div class="app-header-row">
+    <h1 style="margin:0;">Administrator Dashboard</h1>
+  </div>
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       <ul class="flashes">
@@ -10,11 +12,11 @@
       </ul>
     {% endif %}
   {% endwith %}
-  <p><a href="{{ url_for('administrator_bp.accounts') }}">Manage Active Users</a></p>
-  <p><a href="{{ url_for('administrator_bp.disabled_accounts') }}">Manage Inactive Users</a></p>
-  <p><a href="{{ url_for('administrator_bp.add_user') }}">Add a New User</a></p>
-  <p><a href="{{ url_for('administrator_bp.audit_menu') }}">View Audit Logs</a></p>
-  <p><a href="{{ url_for('administrator_bp.locked_users') }}">Unlock accounts</a></p>
-  <a href="{{ url_for('auth.logout') }}">Logout</a>
-  <p><a href="/">Back</a></p>
+  <p><a href="{{ url_for('administrator_bp.accounts') }}" class="btn btn-dash">Manage Active Users</a></p>
+  <p><a href="{{ url_for('administrator_bp.disabled_accounts') }}" class="btn btn-dash">Manage Inactive Users</a></p>
+  <p><a href="{{ url_for('administrator_bp.add_user') }}" class="btn btn-dash">Add a New User</a></p>
+  <p><a href="{{ url_for('administrator_bp.audit_menu') }}" class="btn btn-dash">View Audit Logs</a></p>
+  <p><a href="{{ url_for('administrator_bp.timeout_users') }}" class="btn btn-dash">Timeout Users</a></p>
+  <p><a href="{{ url_for('administrator_bp.locked_users') }}" class="btn btn-dash">Unlock accounts</a></p>
+  <p><a href="{{ url_for('bulk_loading_bp.admin_bulk_loading') }}" class="btn btn-dash">Bulk Load Users</a></p>
 {% endblock %}

@@ -1,3 +1,144 @@
+/* ========== Truck Rewards Cart Page Styles ========== */
+.cart-page h1 {
+  margin-bottom: 1.5rem;
+  color: var(--text);
+}
+
+.cart-items {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cart-item.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.cart-item-img {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.cart-summary.card {
+  margin-top: 2rem;
+  padding: 1.25rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.clear-cart-form {
+  margin-top: 2rem;
+  text-align: right;
+}
+
+.text-danger {
+  color: #ff4a4a;
+  font-weight: 500;
+}
+
+.cart-footer {
+  margin-top: 2rem;
+}
+.dropdown-theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.75rem 1rem;
+  font-family: "Poppins", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.dropdown-theme-toggle .theme-label {
+  flex: 1;
+}
+
+.theme-switch {
+  flex-shrink: 0;
+}
+
+.theme-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.theme-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--border);
+  transition: 0.3s;
+  border-radius: 24px;
+}
+
+.slider::before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: var(--surface);
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--brand-accent);
+}
+
+input:checked + .slider::before {
+  transform: translateX(20px);
+}
+
+.theme-label {
+  margin-left: 0.6rem;
+  color: var(--text);
+}
+/* ================= Dropdown Button for User Menu ================= */
+.dropdown-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  color: var(--text);
+  background: none;
+  border: none;
+  font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI",
+               Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.dropdown-btn:hover {
+  background: var(--sidebar-hover-bg);
+  color: #fff;
+}
 /* =========================================================
    Triple T’s Rewards – Accessible APP STYLES
    WCAG 2.0 AA compliant (contrast, focus, landmarks)
@@ -86,13 +227,30 @@
      justify-content: flex-start;
    }
    
-   .nav-right {
-     display: flex;
-     align-items: center;
-     gap: 0.75rem;
-     justify-content: flex-end;
-     margin-left: auto;
-   }
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  justify-content: flex-end;
+  margin-left: auto;
+  padding-right: 1rem; /* Added to prevent right-side cutoff */
+  overflow: visible;   /* Ensures icons and dropdowns aren't clipped */
+}
+
+/* === Nav icon alignment and spacing === */
+.nav-right .nav-link svg {
+  vertical-align: middle;
+  margin-right: 0.2rem;   /* space between icon and text */
+  padding-right: 2px;     /* ensures no clipping on right edge */
+  overflow: visible;      /* allows full stroke rendering */
+}
+
+.nav-right .nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.35rem;     /* adds minimal horizontal breathing room */
+}
    
    .nav-link,
    .brand {
@@ -148,7 +306,36 @@
      margin: 3px 0;
      border-radius: 2px;
    }
-   
+
+   .page-header {
+      grid-column: 1 / -1;             /* spans both sidebar and main content columns */
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      position: relative;
+      z-index: 2;                      /* keep it above content if needed */
+    }
+    
+    .page-header h1 {
+      margin: 0;
+      font-size: 2rem;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    
+    .page-header h1::after {
+      content: "";
+      display: block;
+      width: 80px;
+      height: 3px;
+      margin-top: 0.35rem;
+      background-color: var(--brand-accent);
+    }
    /* ================= Sidebar / Main Layout ================= */
    .app-layout {
      display: grid;
@@ -230,53 +417,90 @@
      font-size: 0.9rem;
    }
    
-   /* ================= Buttons ================= */
-   .btn {
-     display: inline-flex;
-     align-items: center;
-     justify-content: center;
-     gap: 0.45rem;
-     padding: 0.65rem 1.1rem;
-     font-size: 0.95rem;
-     font-weight: 600;
-     border-radius: 8px;
-     border: 1px solid transparent;
-     cursor: pointer;
-     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.02s ease;
-   }
-   .btn:active { transform: translateY(0.5px); }
-   
-   .btn-primary {
-     background: var(--brand);
-     color: var(--text-on-brand);
-     border-color: transparent;
-   }
-   .btn-primary:hover {
-     background: var(--brand-accent);
-     color: var(--text-on-brand);
-   }
-   
-   .btn-outline {
-     background: transparent;
-     color: var(--text);
-     border-color: var(--border);
-   }
-   .btn-outline:hover {
-     background: var(--sidebar-hover-bg);
-     color: #FFFFFF;
-   }
-   
-   .btn-icon {
-     width: 36px;
-     height: 36px;
-     display: inline-flex;
-     align-items: center;
-     justify-content: center;
-     border-radius: 8px;
-     border: 1px solid var(--border);
-     background: var(--surface);
-   }
-   .btn-icon:hover { background: var(--sidebar-hover-bg); color: #FFFFFF; }
+    /* ================= Buttons ================= */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      padding: 0.65rem 1.1rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.02s ease;
+    }
+    .btn:active { transform: translateY(0.5px); }
+  
+    .btn-primary {
+      background: var(--brand);
+      color: var(--text-on-brand);
+      border-color: transparent;
+    }
+    .btn-primary:hover {
+      background: var(--brand-accent);
+      color: var(--text-on-brand);
+    }
+  
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .btn-outline:hover {
+      background: var(--sidebar-hover-bg);
+      color: #FFFFFF;
+    }
+  
+    .btn-icon {
+      width: 36px;
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .btn-icon:hover { background: var(--sidebar-hover-bg); color: #FFFFFF; }
+  
+    /* --- NEW: Minimal Glassy “Back” Button --- */
+    .btn-dash {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.55rem 1.05rem;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--brand);
+      background: rgba(134, 194, 50, 0.08);
+      
+      border-radius: 10px;
+      transition: all 0.25s ease;
+      box-shadow: 0 0 0 rgba(134, 194, 50, 0);
+    }
+  
+    .btn-dash:hover,
+    .btn-dash:focus-visible {
+      background: var(--brand);
+      color: var(--bg);
+      transform: translateY(-1px);
+      box-shadow: 0 0 8px rgba(134, 194, 50, 0.4);
+    }
+  
+    .btn-dash:active {
+      transform: translateY(0);
+      box-shadow: 0 0 4px rgba(134, 194, 50, 0.3);
+    }
+  
+    /* Optional icon alignment if you use a left arrow icon */
+    .btn-dash svg,
+    .btn-dash i {
+      font-size: 1rem;
+      line-height: 1;
+    }   
    
    /* ================= Forms / Tables ================= */
    label {
@@ -385,3 +609,455 @@
    .hidden { display: none !important; }
    .spacer { height: 1rem; }
    
+   /* ================= Sponsor Points ================= */
+  .data-section {
+    margin-top: 1rem;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 0.9rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .data-table th {
+    background: var(--table-head-bg);
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .points-form {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .input-field.compact {
+    width: 120px;
+    padding: 0.5rem 0.6rem;
+    font-size: 0.9rem;
+  }
+
+  @media (max-width: 768px) {
+    .points-form {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.4rem;
+    }
+    .input-field.compact {
+      width: 100%;
+    }
+  }
+
+  /* ================= Points Summary ================= */
+.summary-section {
+  margin-bottom: 1.5rem;
+}
+
+.summary-card {
+  display: flex;
+  justify-content: flex-start;
+  gap: 2rem;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+
+.summary-item {
+  flex: 1 1 220px;
+}
+
+.summary-item h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.4rem;
+}
+
+.summary-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--brand-accent);
+}
+
+/* =========================================================
+   THEMED CHECKBOXES (Centered + Larger Checkmark)
+   ========================================================= */
+   input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    background-color: var(--bg);
+    cursor: pointer;
+    display: inline-block;
+    vertical-align: middle;
+    position: relative;
+    transition: all 0.2s ease;
+  }
+  
+  /* Checked state */
+  input[type="checkbox"]:checked {
+    background-color: var(--brand);
+    border-color: var(--brand-accent);
+  }
+  
+  /* Bigger, centered checkmark */
+  input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 6px;
+    height: 12px;
+    border-right: 3px solid var(--text-on-brand);
+    border-bottom: 3px solid var(--text-on-brand);
+    transform: translate(-50%, -60%) rotate(45deg);
+    transform-origin: center;
+  }
+  
+  /* Hover + focus ring */
+  input[type="checkbox"]:hover {
+    border-color: var(--brand-accent);
+  }
+  
+  input[type="checkbox"]:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(134, 194, 50, 0.35);
+  }
+  
+  /* Label alignment */
+  .form-group-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+    color: var(--text);
+    font-weight: 500;
+  }
+  
+  /* =========================================================
+   Apply to Sponsor Page Styles
+   ========================================================= */
+.apply-form {
+  max-width: 600px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+/* Headline */
+.apply-form h2 {
+  text-align: left;
+  margin-bottom: 1.5rem;
+  color: var(--text);
+  font-weight: 600;
+  display: inline-block;
+  padding-bottom: 0.35rem;
+}
+
+
+/* Flash messages */
+.flashes {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 1rem;
+}
+.flashes li {
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  border-radius: 8px;
+  font-weight: 500;
+}
+.flashes li.success {
+  background: rgba(134, 194, 50, 0.1);
+  border-left: 4px solid var(--brand);
+  color: var(--brand);
+}
+.flashes li.danger, .flashes li.error {
+  background: rgba(255, 50, 50, 0.08);
+  border-left: 4px solid #ff4a4a;
+  color: #ff8080;
+}
+
+/* Form groups */
+.apply-form label {
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.apply-form select,
+.apply-form textarea {
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.95rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.apply-form select:focus,
+.apply-form textarea:focus {
+  outline: none;
+  border-color: var(--brand-accent);
+  box-shadow: 0 0 0 3px rgba(134,194,50,0.35);
+}
+
+/* Submit + Cancel buttons */
+.apply-form .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.apply-form button[type="submit"] {
+  background: var(--brand);
+  color: var(--text-on-brand);
+  border: none;
+  padding: 0.7rem 1.3rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.apply-form button[type="submit"]:hover {
+  background: var(--brand-accent);
+}
+
+.apply-form button[type="submit"]:active {
+  transform: translateY(1px);
+}
+
+.apply-form a {
+  color: var(--brand-accent);
+  text-decoration: none;
+  align-self: center;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+.apply-form a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* =========================================================
+   USER MENU DROPDOWN
+   ========================================================= */
+.user-menu-container {
+  position: relative;
+  display: inline-block;
+}
+.user-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  z-index: 1000;
+  min-width: 180px;
+  padding: 5px 0;
+}
+.user-menu.open {
+  display: block;
+}
+.user-menu a {
+  display: block;
+  padding: 0.75rem 1rem;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+  transition: background 0.2s ease;
+}
+.user-menu a:hover {
+  background: var(--sidebar-hover-bg);
+  color: #fff;
+}
+.user-menu-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: var(--nav-text);
+  font-size: 1rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  transition: color 0.2s ease;
+}
+.user-menu-toggle:hover {
+  color: var(--brand-accent);
+}
+
+.user-menu-toggle .chevron {
+  transition: transform 0.2s ease;
+}
+
+.user-menu.open ~ .user-menu-toggle .chevron,
+.user-menu-toggle[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+
+.user-name {
+  font-weight: 500;
+}
+
+/* ================= Smooth Theme Transition ================= */
+html, body, .app-root, .site-nav, .app-sidebar, .app-main-content {
+  transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+}
+
+.nav-link, .sidebar-link, .user-menu a, .dropdown-btn, .theme-label {
+  transition: color 0.4s ease, background-color 0.4s ease;
+}
+/* Visually hidden helper class for accessible text (WCAG 2.1 AA) */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+/* ========== Notifications Page ========== */
+.notifications-page h1 {
+  margin-bottom: 1.5rem;
+  color: var(--text);
+}
+
+.notifications-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.notification-item.card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  transition: background 0.3s ease, transform 0.1s ease;
+}
+
+.notification-item.card:hover {
+  transform: translateY(-2px);
+}
+
+.notification-item.unread {
+  background: rgba(255, 193, 7, 0.15);
+  border-left: 4px solid #ffc107;
+}
+
+.notification-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  margin-bottom: 0.4rem;
+}
+
+.notification-header .sender strong {
+  color: var(--text);
+}
+
+.notification-header .timestamp {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.message {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.no-notifications {
+  text-align: center;
+  padding: 2rem;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+/* ========== Send Message Page ========== */
+.message-page h1 {
+  margin-bottom: 1.5rem;
+  color: var(--text);
+}
+
+.message-page .apply-form {
+  max-width: 600px;
+  margin: 2rem auto;
+}
+
+.message-page .form-group {
+  margin-bottom: 1.2rem;
+}
+
+.message-page .form-group label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.message-page .text-danger {
+  color: #ff4a4a;
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+/* ================= Impersonation ================= */
+.impersonation-banner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  z-index: 5;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.impersonation-banner .btn.small {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.875rem;
+}

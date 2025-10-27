@@ -9,9 +9,13 @@ from models import User, Role, StoreSettings, db, DriverApplication, Sponsor, No
 from extensions import db
 import secrets
 import string
+import bcrypt
 
 # Blueprint for sponsor-related routes
 sponsor_bp = Blueprint('sponsor_bp', __name__, template_folder="../templates")
+
+def driver_query_for_sponsor(sponsor_id):
+    return db.session.query(User).filter(User.USER_TYPE == Role.DRIVER, User.SPONSOR_ID == sponsor_id).all()
 
 def next_user_code():
     last_user = User.query.order_by(User.USER_CODE.desc()).first()
@@ -99,80 +103,94 @@ def list_sponsor_users():
 @sponsor_bp.route('/dashboard')
 @role_required(Role.SPONSOR, allow_admin=True)
 def dashboard():
-    settings = StoreSettings.query.first()
-    if not settings:
-        settings = StoreSettings()
-        db.session.add(settings)
-        db.session.commit()
-    drivers = User.query.filter_by(USER_TYPE=Role.DRIVER).all()
-    return render_template('sponsor/dashboard.html', settings=settings, drivers=drivers)
+    return render_template('sponsor/dashboard.html')
 
 # Update Store Settings
-@sponsor_bp.route('/update_settings', methods=['POST'])
+@sponsor_bp.route('/settings', methods=['GET', 'POST'])
 @role_required(Role.SPONSOR, allow_admin=True)
 def update_settings():
     settings = StoreSettings.query.first()
     if not settings:
         settings = StoreSettings()
         db.session.add(settings)
-    settings.ebay_category_id = request.form.get('ebay_category_id')
-    settings.point_ratio = int(request.form.get('point_ratio'))
-    db.session.commit()
-    flash("Store settings updated successfully!", "success")
-    return redirect(url_for('sponsor_bp.dashboard'))
-
-# Award Points to a Driver
-@sponsor_bp.route('/award_points/<int:driver_id>', methods=['POST'])
-@role_required(Role.SPONSOR, allow_admin=True)
-def award_points(driver_id):
-    driver = User.query.get_or_404(driver_id)
-    points_to_add = request.form.get('points', type=int)
-
-    if driver and points_to_add is not None:
-        driver.POINTS += points_to_add
         db.session.commit()
+
+    if request.method == 'POST':
+        settings.ebay_category_id = request.form.get('ebay_category_id')
+        settings.point_ratio = int(request.form.get('point_ratio'))
+        db.session.commit()
+        flash("Store settings updated successfully!", "success")
+        return redirect(url_for('sponsor_bp.update_settings'))
+
+    return render_template("sponsor/settings.html", settings=settings)
+
+
+@sponsor_bp.route('/points', methods=['GET'])
+@role_required(Role.SPONSOR, allow_admin=True)
+def manage_points_page():
+    """Display all drivers for awarding or removing points."""
+    drivers = User.query.filter_by(USER_TYPE=Role.DRIVER).all()
+    return render_template('sponsor/points.html', drivers=drivers)
+
+
+@sponsor_bp.route('/points/<int:driver_id>', methods=['POST'])
+@role_required(Role.SPONSOR, allow_admin=True)
+def manage_points(driver_id):
+    """
+    Allows sponsors to award or remove points from a driver.
+    The form must include:
+      - 'action' = 'award' or 'remove'
+      - 'points' = integer value
+      - optional 'reason' (for removals)
+    """
+    driver = User.query.get_or_404(driver_id)
+    action = request.form.get('action')
+    points = request.form.get('points', type=int)
+    reason = request.form.get('reason', '').strip() or "No reason provided."
+
+    # Validate
+    if not action or action not in ("award", "remove") or points is None or points <= 0:
+        flash("Invalid request. Please provide an action (award/remove) and valid point amount.", "danger")
+        return redirect(url_for('sponsor_bp.manage_points_page'))
+
+    if action == "award":
+        driver.POINTS += points
+        db.session.commit()
+
         log_audit_event(
             DRIVER_POINTS,
-            f"Sponsor {current_user.USERNAME} awarded {points_to_add} points to {driver.USERNAME}."
+            f"Sponsor {current_user.USERNAME} awarded {points} points to {driver.USERNAME}."
         )
-        if driver.wants_point_notifications:
+
+        if getattr(driver, "wants_point_notifications", False):
             Notification.create_notification(
                 recipient_code=driver.USER_CODE,
                 sender_code=current_user.USER_CODE,
-                message=f"You have been awarded {points_to_add} points by {current_user.USERNAME}."
+                message=f"You have been awarded {points} points by {current_user.USERNAME}."
             )
-        flash(f"Successfully awarded {points_to_add} points to {driver.USERNAME}.", "success")
-    else:
-        flash("Could not award points. Please try again.", "danger")
 
-    return redirect(url_for('sponsor_bp.dashboard'))
+        flash(f"✅ Successfully awarded {points} points to {driver.USERNAME}.", "success")
 
-# Remove Points from a Driver
-@sponsor_bp.route('/remove_points/<int:driver_id>', methods=['POST'])
-@role_required(Role.SPONSOR, allow_admin=True)
-def remove_points(driver_id):
-    driver = User.query.get_or_404(driver_id)
-    points_to_remove = request.form.get('points', type=int)
-    reason = request.form.get('reason', 'No reason provided.')
-
-    if driver and points_to_remove is not None:
-        driver.POINTS -= points_to_remove
+    elif action == "remove":
+        driver.POINTS -= points
         db.session.commit()
+
         log_audit_event(
             DRIVER_POINTS,
-            f"Sponsor {current_user.USERNAME} removed {points_to_remove} points from {driver.USERNAME}. Reason: {reason}"
+            f"Sponsor {current_user.USERNAME} removed {points} points from {driver.USERNAME}. Reason: {reason}"
         )
-        if driver.wants_point_notifications:
+
+        if getattr(driver, "wants_point_notifications", False):
             Notification.create_notification(
                 recipient_code=driver.USER_CODE,
                 sender_code=current_user.USER_CODE,
-                message=f"{points_to_remove} points have been removed from your account by {current_user.USERNAME}. Reason: {reason}"
+                message=f"{points} points were removed from your account by {current_user.USERNAME}. Reason: {reason}"
             )
-        flash(f"Successfully removed {points_to_remove} points from {driver.USERNAME}.", "success")
-    else:
-        flash("Could not remove points. Please try again.", "danger")
 
-    return redirect(url_for('sponsor_bp.dashboard'))
+        flash(f"⚠️ Removed {points} points from {driver.USERNAME}.", "info")
+
+    return redirect(url_for('sponsor_bp.manage_points_page'))
+
 
 # Add a New Driver
 @sponsor_bp.route('/add_user', methods=['GET', 'POST'])
@@ -226,6 +244,35 @@ def add_user():
     # Show the form to add a new driver
     return render_template('sponsor/add_user.html')
 
+def get_accepted_drivers_for_sponsor(sponsor_user_code):
+    """
+    Retrieves all drivers who have an 'Accepted' application status 
+    with the given sponsor_user_code using a two-step query for stability.
+    """
+    # Step 1: Filter the DriverApplication table for accepted apps for this sponsor
+    accepted_apps = DriverApplication.query.filter(
+        DriverApplication.SPONSOR_ID == sponsor_user_code,
+        DriverApplication.STATUS == "Accepted" 
+    ).all()
+
+    # If no accepted applications, return an empty list immediately
+    if not accepted_apps:
+        return []
+
+    # Step 2: Get the list of DRIVER_ID codes from the accepted applications
+    driver_codes = [app.DRIVER_ID for app in accepted_apps]
+
+    # Step 3: Filter the User table to get the full driver objects
+    drivers = User.query.filter(User.USER_CODE.in_(driver_codes)).all()
+
+    return drivers
+
+@sponsor_bp.route('/drivers', methods=['GET'])
+@role_required(Role.SPONSOR, allow_admin=True)
+def driver_management():
+    drivers = get_accepted_drivers_for_sponsor(current_user.USER_CODE)
+    return render_template('sponsor/my_organization_drivers.html', drivers=drivers)
+
 # Sponsor Application
 @sponsor_bp.route("/applications")
 @login_required
@@ -244,3 +291,90 @@ def driver_decision(app_id, decision):
     db.session.commit()
     flash(f"Driver application {decision}ed!", "info")
     return redirect(url_for("sponsor_bp.review_driver_applications"))
+
+# Update Contact Information
+@sponsor_bp.route('/update_info', methods=['GET', 'POST'])
+@role_required(Role.DRIVER, Role.SPONSOR, allow_admin=True, redirect_to='auth.login')
+def update_info():
+    from extensions import db
+    
+    sponsor = None
+    if current_user.USER_TYPE == "sponsor":
+        sponsor = Sponsor.query.get(current_user.USER_CODE)
+    
+    if request.method == 'POST':
+        email = request.form.get('email').strip()
+        phone = request.form.get('phone').strip()
+
+        # Basic email validation
+        if not email or '@' not in email:
+            flash('Please enter a valid email address.', 'danger')
+            return redirect(url_for('sponsor_bp.update_info'))
+            
+        # Check if email already exists for another user
+        if User.query.filter(User.EMAIL == email, User.USER_CODE != current_user.USER_CODE).first():
+            flash('Email already in use.', 'danger')
+            return redirect(url_for('sponsor_bp.update_info'))
+        
+        # Basic phone validation (optional)
+        if phone and (not phone.isdigit() or len(phone) < 10):
+            flash('Please enter a valid phone number.', 'danger')
+            return redirect(url_for('sponsor_bp.update_contact'))
+        
+        # Check if phone already exists for another user
+        if phone and User.query.filter(User.PHONE == phone, User.USER_CODE != current_user.USER_CODE).first():
+            flash('Phone number already in use.', 'danger')
+            return redirect(url_for('sponsor_bp.update_contact'))
+        
+        try:
+            current_user.EMAIL = email
+            current_user.PHONE = phone
+
+            db.session.commit()
+            flash('Contact information updated successfully!', 'success')
+            return redirect(url_for('sponsor_bp.dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while updating your information', 'danger')
+            return redirect(url_for('sponsor_bp.update_info'))
+
+    return render_template('sponsor/update_info.html', user=current_user, sponsor=sponsor)
+
+# Update Password
+@sponsor_bp.route('/change_password', methods=['GET', 'POST'])
+@role_required(Role.DRIVER, Role.SPONSOR, allow_admin=True, redirect_to='auth.login')
+def change_password():
+    from extensions import db
+
+    if request.method == 'POST':
+        current_password = request.form.get('current_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+
+        # Verify current password
+        if not bcrypt.check_password_hash(current_user.PASS, current_password):
+            flash('Current password is incorrect.', 'danger')
+            return redirect(url_for('sponsor_bp.change_password'))
+
+        # Validate new password
+        if new_password != confirm_password:
+            flash('New passwords do not match.', 'danger')
+            return redirect(url_for('sponsor_bp.change_password'))
+        
+        if len(new_password) < 8:
+            flash('Password must be at least 8 characters long.', 'danger')
+            return redirect(url_for('sponsor_bp.change_password'))
+        
+        # Update password and email
+        try:
+            hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+            current_user.PASS = hashed_password
+            db.session.commit()
+            flash('Information updated successfully!', 'success')
+            return redirect(url_for('sponsor_bp.dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while updating your information', 'danger')
+            return redirect(url_for('sponsor_bp.change_password'))
+
+    return render_template('sponsor/update_info.html', user=current_user)

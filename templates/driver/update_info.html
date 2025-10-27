@@ -38,7 +38,7 @@
               value="{{ driver.LICENSE_NUMBER or '' }}">
       </div>
     {% endif %}
-    <button type="submit" class="btn btn-primary">Apply Changes</button>
+    <p><button type="submit" class="btn btn-primary">Apply Changes</button></p>
   </form>
 
   <form method="POST" action="{{ url_for('driver_bp.change_password') }}">
@@ -57,11 +57,10 @@
       <input type="password" id="confirm_password" name="confirm_password" required>
     </div>
     
-    <button type="submit" class="btn btn-primary">Submit</button>
+    <p><button type="submit" class="btn btn-primary">Submit</button></p>
   </form>
   
   <div style="margin-top: 1rem;">
-    <a href="{{ url_for('driver_bp.dashboard') }}" class="btn">Back to Dashboard</a>
-    <a href="{{ url_for('driver_bp.logout') }}" class="btn">Logout</a>
+    <a href="{{ url_for('driver_bp.dashboard') }}" class="btn btn-outline">Back to Dashboard</a>
   </div>
 {% endblock %}

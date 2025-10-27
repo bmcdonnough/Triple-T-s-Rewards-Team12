@@ -69,7 +69,7 @@ def settings():
         db.session.commit()
         
         flash('Your settings have been updated!', 'success')
-        return redirect(url_for('driver_bp.settings'))
+        return redirect(url_for('driver_bp.dashboard'))
         
     return render_template('driver/settings.html')
 
@@ -188,7 +188,7 @@ def apply_driver():
                 SPONSOR_ID=sponsor_id,
                 REASON=reason,
                 STATUS="Pending",
-                LICENSE_NUMBER=driver.LICENSE_NUMBER if driver else None
+                LICENSE_NUMBER=current_user.LICENSE_NUMBER if current_user else None
             )
             db.session.add(application)
             db.session.commit()

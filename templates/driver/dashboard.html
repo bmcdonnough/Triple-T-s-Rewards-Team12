@@ -9,12 +9,10 @@
         <p>Current Exchange Rate: {{ point_ratio }} points per dollar</p>
     </div>
 
-    <p><a href="{{ url_for('driver_bp.point_history') }}">View Point History</a></p>
-    <p><a href="{{ url_for('driver_bp.addresses') }}">Manage Shipping Addresses</a></p>
-    <p><a href="{{ url_for('driver_bp.settings') }}">My Settings</a></p>
-    <a href="{{ url_for('driver_bp.logout') }}">Logout</a><br>
-    <a href="{{ url_for('driver_bp.update_contact') }}">Edit Account Information</a><br>
-    <a href="{{ url_for('driver_bp.apply_driver') }}">Apply to a Sponsor</a><br>
-    <p><a href="/">Back</a></p>
+    <p><a href="{{ url_for('driver_bp.point_history') }}" class="btn btn-dash">View Point History</a></p>
+    <p><a href="{{ url_for('driver_bp.addresses') }}" class="btn btn-dash">Manage Shipping Addresses</a></p>
+    <p><a href="{{ url_for('driver_bp.settings') }}" class="btn btn-dash">My Settings</a></p>
+    <p><a href="{{ url_for('driver_bp.update_contact') }}" class="btn btn-dash">Edit Account Information</a></p>
+    <p><a href="{{ url_for('driver_bp.apply_driver') }}" class="btn btn-dash">Apply to a Sponsor</a></p>
   </body>
 {% endblock %}

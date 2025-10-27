@@ -63,6 +63,13 @@
               <td>{{ user.CREATED_AT.strftime('%Y-%m-%d %H:%M') }}</td>
               <td>
                 <div style="display:flex; gap:.5rem; align-items:center;">
+                  <form method="POST" action="{{ url_for('impersonation_bp.start_impersonation', target_id=user.USER_CODE) }}" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-outline small" title="Impersonate this user">
+                      Impersonate
+                    </button>
+                  </form>
+
                   <a
                     href="{{ url_for('administrator_bp.edit_user', user_id=user.USER_CODE) }}"
                     class="btn btn-outline"

@@ -7,7 +7,8 @@ from sqlalchemy import or_
 from common.logging import (LOGIN_EVENT,
     SALES_BY_SPONSOR, SALES_BY_DRIVER, INVOICE_EVENT,
     DRIVER_POINTS)
-from datetime import datetime
+from common.logging import (LOGIN_EVENT, SALES_BY_SPONSOR, SALES_BY_DRIVER, INVOICE_EVENT, DRIVER_POINTS, log_audit_event)
+from datetime import datetime, timedelta
 from models import db, Sponsor
 import csv
 from io import StringIO
@@ -15,14 +16,31 @@ from io import StringIO
 # Blueprint for administrator-related routes
 administrator_bp = Blueprint('administrator_bp', __name__, template_folder="../templates")
 
-@administrator_bp.get("audit_logs/export")
+@administrator_bp.get("/audit_logs/export")
 @role_required(Role.ADMINISTRATOR, allow_admin=False)
 def export_audit_csv():
+    selected_type = request.args.get("type") or request.args.get("event_type")
+    start_str = request.args.get("start")
+    end_str = request.args.get("end")
+    
+    def parse_date(date_str):
+        try:
+            return datetime.strptime(date_str, "%Y-%m-%d")
+        except (ValueError, TypeError):
+            return None
+
+    start_dt = parse_date(start_str)
+    end_dt = parse_date(end_str)
+
     event_type = request.args.get("event_type")
     q = AuditLog.query.order_by(AuditLog.CREATED_AT.desc())
     if event_type:
         q = q.filter(AuditLog.EVENT_TYPE == event_type)
-    rows = q.all()
+    if start_dt:
+        q = q.filter(AuditLog.CREATED_AT >= start_dt)
+    if end_dt:
+        q = q.filter(AuditLog.CREATED_AT < end_dt + timedelta(days=1))
+    rows = q.order_by(AuditLog.CREATED_AT.desc()).all()
     
     si = StringIO()
     cw = csv.writer(si)
@@ -115,20 +133,43 @@ def dashboard():
 @administrator_bp.get('/audit_logs/view')
 @role_required(Role.ADMINISTRATOR, allow_admin=False)
 def view_audit_logs():
+    select_type = request.args.get("type")
+    start_str = request.args.get("start")
+    end_str = request.args.get("end")
+    
     event_type = request.args.get("event_type")
-    allowed = {LOGIN_EVENT, SALES_BY_SPONSOR, SALES_BY_DRIVER, INVOICE_EVENT, DRIVER_POINTS}
-    if event_type not in allowed:
-        flash("Unknown audit log type.", "warning")
-        return redirect(url_for("administrator_bp.audit_menu"))
 
-    q = AuditLog.query.order_by(AuditLog.CREATED_AT.desc())
-    if event_type:
-        q = q.filter(AuditLog.EVENT_TYPE == event_type)
+    allowed = {LOGIN_EVENT, SALES_BY_SPONSOR, SALES_BY_DRIVER, INVOICE_EVENT, DRIVER_POINTS}
+    if select_type and select_type not in allowed:
+        flash("Unknown audit log type.", "warning")
+        select_type = None
+
+    q = AuditLog.query
+    if select_type:
+        q = q.filter(AuditLog.EVENT_TYPE == select_type)
         
     events = q.limit(500).all()
+    
+    def parse_date(s):
+        if not s:
+            return None
+        try:
+            return datetime.strptime(s, "%Y-%m-%d")
+        except ValueError:
+            return None
+    
+    start_dt = parse_date(start_str)
+    end_dt = parse_date(end_str)
+
+    if start_dt:
+        q = q.filter(AuditLog.CREATED_AT >= start_dt)
+    if end_dt:
+        q = q.filter(AuditLog.CREATED_AT < end_dt + timedelta(days=1))
+
+    events = q.order_by(AuditLog.CREATED_AT.desc()).limit(500).all()
 
     logs = (AuditLog.query
-            .filter(AuditLog.EVENT_TYPE == event_type)
+            .filter(AuditLog.EVENT_TYPE == select_type)
             .order_by(AuditLog.CREATED_AT.desc())
             .limit(200)
             .all())
@@ -141,9 +182,16 @@ def view_audit_logs():
         INVOICE_EVENT: "Invoices",
         DRIVER_POINTS: "Driver Point Tracking",
     }
+
+    title = titles.get(select_type, "Audit Logs")
+    
     return render_template(
         "administrator/audit_list.html",
-        title=titles.get(event_type, "Unknown Event"),
+        logs = logs,
+        start=start_str,
+        end=end_str,
+        select_type=select_type,
+        title=titles.get(event_type, "Audit Logs"),
         events=events,
         event_type=event_type
     )
@@ -197,7 +245,7 @@ def add_user():
             CREATED_AT=datetime.now(),
             IS_ACTIVE=1
         )
-        new_pass = new_user.set_password()
+        new_pass = new_user.admin_set_new_pass()
 
         flash_message = (
         f"🚨 **TEMPORARY PASSWORD FOR TESTING:** `{new_pass}`. "
@@ -399,3 +447,41 @@ def sponsor_decision(sponsor_id, decision):
     db.session.commit()
     flash(f"Sponsor {decision}d!", "info")
     return redirect(url_for("adminstrator_bp.review_sponsors"))
+
+@administrator_bp.get("/timeouts")
+@role_required(Role.ADMINISTRATOR)
+def timeout_users():
+    users = User.query.order_by(User.USERNAME.asc()).all()
+    return render_template("administrator/timeout_users.html", users=users)
+
+@administrator_bp.post("/set_timeout/<int:user_id>")
+@role_required(Role.ADMINISTRATOR)
+def set_timeout(user_id):
+    minutes = int(request.form.get("minutes", 0))
+    user = User.query.get_or_404(user_id)
+    
+    if minutes <= 0:
+        flash("Duration must be greater than zero.", "danger")
+        return redirect(url_for("administrator_bp.timeout_users"))
+    
+    user.IS_LOCKED_OUT = 1
+    user.LOCKOUT_TIME = datetime.utcnow() + timedelta(minutes=minutes)
+    user.LOCKED_REASON = "admin"
+    db.session.commit()
+    
+    log_audit_event("ADMIN_TIMEOUT", f"User {user.USERNAME} timed out for {minutes} minutes.")
+    flash(f"User {user.USERNAME} has been timed out for {minutes} minutes.", "info")
+    return redirect(url_for("administrator_bp.timeout_users"))
+
+@administrator_bp.route("/clear_timeout/<int:user_id>", methods=["POST"])
+@login_required
+def clear_timeout(user_id):
+    user = User.query.get_or_404(user_id)
+    user.FAILED_ATTEMPTS = 0
+    user.LOCKOUT_TIME = None
+    user.IS_LOCKED_OUT = 0
+    user.LOCKED_REASON = None
+    db.session.commit()
+    log_audit_event("ADMIN_CLEAR_TIMEOUT", f"Timeout cleared for user {user.USERNAME}.")
+    flash(f"Timeout cleared for user {user.USERNAME}.", "success")
+    return redirect(url_for("administrator_bp.timeout_users"))

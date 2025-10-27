@@ -1,38 +1,43 @@
 from flask_wtf import FlaskForm
-from wtforms import TextAreaField, SubmitField, SelectField
+from extensions import db
+from wtforms import BooleanField, SelectMultipleField, TextAreaField, SubmitField, SelectField
 from wtforms.validators import DataRequired, Length
-from models import User
+from models import Role, User
 
 # Assuming your User model has USERNAME, FNAME, and LNAME attributes
 class SendNotificationForm(FlaskForm):
-    recipient = SelectField('Recipient', 
-                            validators=[DataRequired()], 
-                            coerce=int)
+    recipients = SelectMultipleField("Recipients", coerce=int) 
     
-    message = TextAreaField('Message Content', 
-                            validators=[
-                                DataRequired(), 
-                                Length(min=5, max=500, message='Message must be between 5 and 500 characters.')
-                            ], 
-                            render_kw={"rows": 5})
+    message = TextAreaField('Message', validators=[DataRequired()])
     
     submit = SubmitField('Send Message')
+    send_all = BooleanField('Send to All Drivers')
     
     def __init__(self, current_user_code=None, *args, **kwargs):
         super(SendNotificationForm, self).__init__(*args, **kwargs)
         
         # 1. Fetch all active users, ordered by Username
-        users = User.query.filter_by(IS_ACTIVE=True).order_by(User.USERNAME).all()
+        users = (User.query.filter(User.IS_ACTIVE == 1)
+         .with_entities(User.USER_CODE, User.USERNAME, User.USER_TYPE)
+         .order_by(User.USERNAME)
+         .all())
         
-        choices = []
-        for u in users:
-            # 2. Create the display label: "USERNAME (First Name Last Name)"
-            display_name = f"{u.USERNAME} ({u.FNAME} {u.LNAME})"
-            
-            # 3. Skip the current user if their USER_CODE is provided
-            if current_user_code is None or u.USER_CODE != current_user_code:
-                # The value (u.USER_CODE) must be the integer ID you save in the database
-                choices.append((u.USER_CODE, display_name))
+        rows = (User.query
+                .with_entities(
+                    User.USER_CODE,   # index 0
+                    User.USERNAME,    # index 1
+                    User.FNAME,       # index 2
+                    User.LNAME        # index 3
+                )
+                .filter(User.IS_ACTIVE == 1)
+                .order_by(User.USERNAME.asc())
+                .all())
+
+        if current_user_code is not None:
+            rows = [r for r in rows if r[0] != int(current_user_code)]
         
         # 4. Set the final choices list
-        self.recipient.choices = choices
+        self.recipients.choices = [
+            (user_code, f"{username} ({(fname or '').strip()} {(lname or '').strip()})".strip())
+            for (user_code, username, fname, lname) in rows
+        ]

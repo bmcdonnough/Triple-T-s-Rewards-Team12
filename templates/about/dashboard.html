@@ -8,7 +8,7 @@
     {# The base template also handles current_user.is_authenticated check for navbar/scripts #}
 
     {% if current_user.is_authenticated and current_user.USER_TYPE == 'administrator' %}
-      <a href="{{ url_for('about_bp.edit_about') }}">Edit About</a>
+      <a href="{{ url_for('about_bp.edit_about') }}" class="btn btn-dash">Edit About</a>
     {% endif %}
     </p>
 

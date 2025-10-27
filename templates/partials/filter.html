@@ -1,0 +1,105 @@
+<form method="get" action="{{ action or request.path }}" class="filter-bar">
+  {# Preserve extra context from the page if needed #}
+  {% if selected_type %}<input type="hidden" name="type" value="{{ selected_type }}">{% endif %}
+
+  <button type="button" class="filter-toggle" aria-expanded="false" aria-controls="filter-panel">
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z" fill="currentColor"/>
+    </svg>
+    <span>Filter</span>
+  </button>
+
+  <div id="filter-panel" class="filter-panel" hidden>
+    <label>
+      Mode
+      <select name="mode" id="filter-mode">
+        <option value="date" {{ 'selected' if (mode or 'date') == 'date' else '' }}>Date</option>
+        <option value="type" {{ 'selected' if mode == 'type' else '' }}>Type</option>
+        <option value="user" {{ 'selected' if mode == 'user' else '' }}>User</option>
+        <option value="text" {{ 'selected' if mode == 'text' else '' }}>Contains</option>
+      </select>
+    </label>
+
+    <!-- Date section -->
+    <div class="filter-section" data-mode="date">
+      <div class="custom-dates" {{ '' if date_preset=='custom' else 'hidden' }}>
+        <label>Start <input type="date" name="start" value="{{ start or '' }}"></label>
+        <label>End   <input type="date" name="end"   value="{{ end or '' }}"></label>
+      </div>
+    </div>
+
+    <!-- Type section -->
+    <div class="filter-section" data-mode="type" hidden>
+      <label>Event Type
+        <select name="event_type">
+          <option value="">-- Any --</option>
+          {% for t in event_types or [] %}
+            <option value="{{ t }}" {{ 'selected' if event_type==t else '' }}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <!-- User section -->
+    <div class="filter-section" data-mode="user" hidden>
+      <label>Username
+        <input type="text" name="username" value="{{ username or '' }}" placeholder="e.g. alice">
+      </label>
+    </div>
+
+    <!-- Text section -->
+    <div class="filter-section" data-mode="text" hidden>
+      <label>Contains
+        <input type="text" name="q" value="{{ q or '' }}" placeholder="Search details…">
+      </label>
+    </div>
+
+    <button class="btn" type="submit">Apply</button>
+    <a class="btn-outline" href="{{ action or request.path }}">Clear</a>
+  </div>
+</form>
+
+<script>
+(function () {
+  const root = document.currentScript.closest('form');
+  const toggle = root.querySelector('.filter-toggle');
+  const panel = root.querySelector('#filter-panel');
+  const modeSel = root.querySelector('#filter-mode');
+  const sections = root.querySelectorAll('.filter-section');
+  const datePreset = root.querySelector('#date-preset');
+  const customDates = root.querySelector('.custom-dates');
+
+  function syncPanel() {
+    const mode = modeSel.value;
+    sections.forEach(s => {
+      s.hidden = s.getAttribute('data-mode') !== mode;
+    });
+    if (datePreset) {
+      const isCustom = datePreset.value === 'custom';
+      if (customDates) customDates.toggleAttribute('hidden', !isCustom);
+    }
+  }
+
+  toggle.addEventListener('click', () => {
+    const open = !panel.hasAttribute('hidden');
+    panel.toggleAttribute('hidden', open);
+    toggle.setAttribute('aria-expanded', (!open).toString());
+  });
+
+  modeSel.addEventListener('change', syncPanel);
+  if (datePreset) datePreset.addEventListener('change', syncPanel);
+
+  // initial
+  syncPanel();
+})();
+</script>
+
+<style>
+  .filter-bar { display:flex; align-items:center; gap:.75rem; margin:.5rem 0 1rem; }
+  .filter-toggle { display:inline-flex; align-items:center; gap:.4rem; padding:.35rem .6rem; border:1px solid var(--border); background:var(--surface); color:var(--text); border-radius:.4rem; cursor:pointer; }
+  .filter-toggle:hover { filter: brightness(1.05); }
+  .filter-panel { display:flex; flex-wrap:wrap; align-items:end; gap:.6rem 1rem; padding:.6rem; border:1px solid var(--border); background:var(--surface); border-radius:.5rem; }
+  .filter-panel label { display:flex; flex-direction:column; font-size:.9rem; gap:.25rem; min-width: 200px; }
+  .filter-panel input[type="date"], .filter-panel input[type="text"], .filter-panel select { padding:.35rem .45rem; border:1px solid var(--border); border-radius:.35rem; background:var(--bg); color:var(--text); }
+  .custom-dates { display:flex; gap:.6rem; }
+</style>

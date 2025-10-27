@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="app-main-content container">
+  <h1>Manage Driver Points</h1>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash-messages {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  {% if drivers %}
+    <!-- ====== Points Summary Section ====== -->
+    <section class="summary-section">
+      {% set total_points = drivers | sum(attribute='POINTS') %}
+      {% set avg_points = (total_points / (drivers|length)) | round(2) %}
+      <div class="summary-card">
+        <div class="summary-item">
+          <h3>Total Points Across All Drivers</h3>
+          <p class="summary-value">{{ total_points }}</p>
+        </div>
+        <div class="summary-item">
+          <h3>Average Points per Driver</h3>
+          <p class="summary-value">{{ avg_points }}</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== Driver Table ====== -->
+    <section class="data-section">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Driver</th>
+            <th>Current Points</th>
+            <th>Award Points</th>
+            <th>Remove Points</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for driver in drivers %}
+          <tr>
+            <td>{{ driver.USERNAME }}</td>
+            <td>{{ driver.POINTS }}</td>
+
+            <!-- Award form -->
+            <td>
+              <form
+                method="POST"
+                action="{{ url_for('sponsor_bp.manage_points', driver_id=driver.USER_CODE) }}"
+                class="points-form"
+              >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="award">
+                <input
+                  type="number"
+                  name="points"
+                  min="1"
+                  class="input-field compact"
+                  placeholder="Points"
+                  required
+                >
+                <button type="submit" class="btn btn-primary">Award</button>
+              </form>
+            </td>
+
+            <!-- Remove form -->
+            <td>
+              <form
+                method="POST"
+                action="{{ url_for('sponsor_bp.manage_points', driver_id=driver.USER_CODE) }}"
+                class="points-form"
+              >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="remove">
+                <input
+                  type="number"
+                  name="points"
+                  min="1"
+                  class="input-field compact"
+                  placeholder="Points"
+                  required
+                >
+                <input
+                  type="text"
+                  name="reason"
+                  class="input-field compact"
+                  placeholder="Reason (optional)"
+                >
+                <button type="submit" class="btn btn-outline">Remove</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  {% else %}
+    <p class="text-muted">No drivers found.</p>
+  {% endif %}
+
+  <div class="spacer"></div>
+  <a href="{{ url_for('sponsor_bp.dashboard') }}" class="btn btn-outline">← Back to Dashboard</a>
+</main>
+{% endblock %}

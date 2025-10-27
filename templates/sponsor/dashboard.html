@@ -1,7 +1,7 @@
-{# triple-ts-rewards/triple-t-s-rewards/Triple-T-s-Rewards-72ca7a46f1915a7f669f3692e9b77d23b248eaee/templates/sponsor/dashboard.html #}
 {% extends "base.html" %}
 {% block content %}
-    <h2>Sponsor Dashboard</h2>
+  <main class="app-main-content container">
+    <h1>Sponsor Dashboard</h1>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -11,77 +11,17 @@
       {% endif %}
     {% endwith %}
 
-    <div class="box" style="margin-bottom: 2rem; max-width: 600px;">
-        <h3>Award/Remove Points</h3>
-        {% if drivers %}
-            <table style="width: 100%;">
-                <thead>
-                    <tr>
-                        <th>Driver Username</th>
-                        <th>Current Points</th>
-                        <th style="width: 200px;">Add Points</th>
-                        <th style="width: 300px;">Remove Points</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for driver in drivers %}
-                    <tr>
-                        <td>{{ driver.USERNAME }}</td>
-                        <td>{{ driver.POINTS }}</td>
-                        <td>
-                            <form method="POST" action="{{ url_for('sponsor_bp.award_points', driver_id=driver.USER_CODE) }}" style="display: flex; gap: 0.5rem;">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="number" name="points" min="1" placeholder="Points" style="width: 100px;" required>
-                                <button type="submit" class="btn">Award</button>
-                            </form>
-                        </td>
-                        <td>
-                            <form method="POST" action="{{ url_for('sponsor_bp.remove_points', driver_id=driver.USER_CODE) }}" style="display: flex; gap: 0.5rem;">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="number" name="points" min="1" placeholder="Points" style="width: 100px;" required>
-                                <input type="text" name="reason" placeholder="Reason" style="width: 150px;" required>
-                                <button type="submit" class="btn">Remove</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% else %}
-            <p>No drivers found.</p>
-        {% endif %}
+    <div class="dashboard-links">
+      <p><a href="{{ url_for('sponsor_bp.manage_points_page') }}" class="btn btn-primary">Award / Remove Points</a></p>
+      <p><a href="{{ url_for('sponsor_bp.driver_management') }}" class="btn btn-primary">Driver Management</a></p>
+      <p><a href="{{ url_for('sponsor_bp.review_driver_applications') }}" class="btn btn-primary">Review Applications</a></p>
+      <p><a href="{{ url_for('sponsor_bp.update_settings') }}" class="btn btn-primary">Store Settings</a></p>
+      <p><a href="{{ url_for('sponsor_bp.list_sponsor_users') }}" class="btn btn-primary">Sponsor Accounts</a></p>
+      <p><a href="{{ url_for('bulk_loading_bp.sponsor_bulk_loading') }}" class="btn btn-primary">Bulk Load Users</a></p>
+      <p><a href="{{ url_for('sponsor_bp.update_info') }}" class="btn btn-primary">Edit Account Info</a></p>
     </div>
 
-    <div class="box" style="margin-bottom: 2rem;">
-        <h3>Driver Management</h3>
-        <a href="{{ url_for('sponsor_bp.add_user') }}">Add a New Driver</a>
-    </div>
-
-    <div class="box" style="margin-bottom: 2rem;">
-        <h3>Pending Driver Applications</h3>
-        <p>View and review applications submitted by drivers.</p>
-        <a href="{{ url_for('sponsor_bp.review_driver_applications') }}">Review Driver Applications</a>
-    </div>
-    
-    <div class="box">
-        <h3>Current Store Settings</h3>
-        <p><strong>eBay Category ID:</strong> {{ settings.ebay_category_id }}</p>
-        <p><strong>Points per Dollar:</strong> {{ settings.point_ratio }}</p>
-    </div>
-
-    <form method="POST" action="{{ url_for('sponsor_bp.update_settings') }}" style="margin-top: 2rem;">
-        <h3>Update Store Settings</h3>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label for="ebay_category_id">eBay Category ID:</label>
-        <input type="text" id="ebay_category_id" name="ebay_category_id" value="{{ settings.ebay_category_id }}" required>
-        <label for="point_ratio">Points per Dollar:</label>
-        <input type="number" id="point_ratio" name="point_ratio" value="{{ settings.point_ratio }}" required>
-        <button type="submit" class="btn">Save Changes</button>
-    </form>
-
-    <p><a href="{{ url_for('sponsor_bp.create_sponsor_user') }}">Create Sponsor Account</a></p>
-    <p><a href="{{ url_for('sponsor_bp.list_sponsor_users') }}">View Sponsor Accounts</a></p>
-
-    <a href="{{ url_for('auth.logout') }}">Logout</a>
-    <p><a href="/">Back</a></p>
+    <div class="spacer"></div>
+    <a href="{{ url_for('auth.logout') }}" class="btn btn-outline">Logout</a>
+  </main>
 {% endblock %}

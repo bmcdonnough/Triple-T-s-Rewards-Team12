@@ -1,82 +1,87 @@
 {% extends "base.html" %}
 {% block content %}
 <head>
-    <title>Your Shopping Cart</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/truck-rewards.css') }}">
-    <style>
-        .cart-item { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #eee; padding-bottom: 1rem; }
-        .cart-item img { width: 100px; height: 100px; object-fit: contain; }
-        .cart-summary { margin-top: 2rem; padding-top: 1rem; border-top: 2px solid #333; }
-    </style>
+  <title>Your Shopping Cart</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/truck-rewards.css') }}">
 </head>
 <body>
+  <section class="cart-page container">
     <h1>Your Shopping Cart</h1>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        {% for category, message in messages %}
-          <div class="flash-messages {{ category }}">{{ message }}</div>
-        {% endfor %}
+        <ul class="flashes">
+          {% for category, message in messages %}
+            <li class="{{ category }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
       {% endif %}
     {% endwith %}
 
     {% if cart_items %}
-        <div>
-            {% for item in cart_items %}
-            <div class="cart-item">
-                <img src="{{ item.image_url or 'https://i.ebayimg.com/images/g/placeholder/s-l225.jpg' }}" alt="{{ item.title }}">
-                <div style="flex-grow: 1;">
-                    <p><strong>{{ item.title }}</strong></p>
-                    <p>{{ item.points }} points x {{ item.quantity }}</p>
-                </div>
-                <form method="POST" action="{{ url_for('rewards_bp.remove_from_cart', item_id=item.id) }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit">Remove</button>
-                </form>
+      <div class="cart-items">
+        {% for item in cart_items %}
+          <div class="cart-item card">
+            <img src="{{ item.image_url or 'https://i.ebayimg.com/images/g/placeholder/s-l225.jpg' }}" alt="{{ item.title }}" class="cart-item-img">
+            <div class="cart-item-details">
+              <p class="item-title"><strong>{{ item.title }}</strong></p>
+              <p class="item-points">{{ item.points }} points × {{ item.quantity }}</p>
             </div>
-            {% endfor %}
-        </div>
+            <form method="POST" action="{{ url_for('rewards_bp.remove_from_cart', item_id=item.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-outline">Remove</button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
 
-        <div class="cart-summary">
-            <h3>Total Points: {{ total_points }}</h3>
-            <p>Your Balance: {{ current_user.POINTS }} points</p>
-            
-            {% if addresses %}
-              <div class="form-group">
-                <label for="shipping_address">Select a Shipping Address:</label>
-                <select id="shipping_address" name="shipping_address">
-                  {% for address in addresses %}
-                    <option value="{{ address.id }}" {% if address.is_default %}selected{% endif %}>
-                      {{ address.street }}, {{ address.city }}, {{ address.state }} {{ address.zip_code }}
-                    </option>
-                  {% endfor %}
-                </select>
-              </div>
-            {% else %}
-              <p>You have no saved addresses. <a href="{{ url_for('driver_bp.add_address') }}">Add one now.</a></p>
-            {% endif %}
+      <div class="cart-summary card">
+        <h3>Total Points: <span class="summary-value">{{ total_points }}</span></h3>
+        <p>Your Balance: <strong>{{ current_user.POINTS }}</strong> points</p>
 
-            {% if current_user.POINTS >= total_points and addresses %}
-                <form method="POST" action="{{ url_for('rewards_bp.checkout') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" style="background-color: green;">Checkout</button>
-                </form>
-            {% elif not addresses %}
-                <p style="color: red;">Please add a shipping address before checking out.</p>
-            {% else %}
-                <p style="color: red;">You don't have enough points to checkout.</p>
-            {% endif %}
-        </div>
+        {% if addresses %}
+          <div class="form-group">
+            <label for="shipping_address">Select a Shipping Address:</label>
+            <select id="shipping_address" name="shipping_address" class="input-field">
+              {% for address in addresses %}
+                <option value="{{ address.id }}" {% if address.is_default %}selected{% endif %}>
+                  {{ address.street }}, {{ address.city }}, {{ address.state }} {{ address.zip_code }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        {% else %}
+          <p>You have no saved addresses. 
+            <a href="{{ url_for('driver_bp.add_address') }}" class="link">Add one now.</a>
+          </p>
+        {% endif %}
 
-        <form method="POST" action="{{ url_for('rewards_bp.clear_cart') }}" onsubmit="return confirm('Are you sure you want to clear your entire cart?');" style="margin-top: 2rem;">
+        {% if current_user.POINTS >= total_points and addresses %}
+          <form method="POST" action="{{ url_for('rewards_bp.checkout') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" style="background-color: red;">Clear Entire Cart</button>
-        </form>
+            <button type="submit" class="btn btn-primary">Checkout</button>
+          </form>
+        {% elif not addresses %}
+          <p class="text-danger">Please add a shipping address before checking out.</p>
+        {% else %}
+          <p class="text-danger">You don't have enough points to checkout.</p>
+        {% endif %}
+      </div>
+
+      <form method="POST" action="{{ url_for('rewards_bp.clear_cart') }}" 
+            onsubmit="return confirm('Are you sure you want to clear your entire cart?');" 
+            class="clear-cart-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline" style="color: #ff4a4a; border-color: #ff4a4a;">Clear Entire Cart</button>
+      </form>
 
     {% else %}
-        <p>Your cart is empty.</p>
+      <p>Your cart is empty.</p>
     {% endif %}
 
-    <a href="{{ url_for('rewards_bp.store') }}">Back to Store</a>
+    <div class="cart-footer">
+      <a href="{{ url_for('rewards_bp.store') }}" class="btn btn-dash">Back to Store</a>
+    </div>
+  </section>
 </body>
 {% endblock %}

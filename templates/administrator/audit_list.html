@@ -8,6 +8,10 @@
       ⬇︎ Download CSV
     </a>
   </div>
+
+  {% include "partials/filter.html" with context %}
+  {# ... your table follows ... #}
+
   {% if events|length == 0 %}
     <p class="muted">No events yet.</p>
   {% else %}

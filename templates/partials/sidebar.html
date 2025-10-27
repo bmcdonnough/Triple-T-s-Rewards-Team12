@@ -41,29 +41,23 @@
                 
                 {# Admin Dashboard Link: Only visible to 'administrator' #}
                 {% if current_user.is_authenticated and current_user.USER_TYPE == 'administrator' %}
-                    <li>
                         <a href="{{ url_for('administrator_bp.dashboard') }}" class="sidebar-link sub-link {{ 'active' if request.endpoint == 'administrator_bp.dashboard' else '' }}">
                             Admin Dashboard
                         </a>
-                    </li>
                 {% endif %}
 
                 {# Sponsor Dashboard Link: Visible to 'administrator' and 'sponsor' #}
                 {% if current_user.is_authenticated and current_user.USER_TYPE in ['administrator', 'sponsor'] %}
-                    <li>
                         <a href="{{ url_for('sponsor_bp.dashboard') }}" class="sidebar-link sub-link {{ 'active' if request.endpoint == 'sponsor_bp.dashboard' else '' }}">
                             Sponsor Dashboard
                         </a>
-                    </li>
                 {% endif %}
 
                 {# Driver Dashboard Link: Visible to all three roles #}
                 {% if current_user.is_authenticated and current_user.USER_TYPE in ['administrator', 'sponsor', 'driver'] %}
-                    <li>
                         <a href="{{ url_for('driver_bp.dashboard') }}" class="sidebar-link sub-link {{ 'active' if request.endpoint == 'driver_bp.dashboard' else '' }}">
                             Driver Dashboard
                         </a>
-                    </li>
                 {% endif %}
             </ul>
         </li>
@@ -88,8 +82,8 @@
         {# --- Sponsor Links (Other than Dashboard) --- #}
         {% if current_user.is_authenticated and current_user.USER_TYPE == 'sponsor' %}
             <li>
-                {% set sponsor_driver_endpoints = ['sponsor_bp.list_users', 'sponsor_bp.add_user', 'sponsor_bp.create_user'] %}
-                <a href="{{ url_for('sponsor_bp.list_users') }}" class="sidebar-link {{ 'active' if request.endpoint in sponsor_driver_endpoints else '' }}">
+                {% set sponsor_driver_endpoints = ['sponsor_bp.list__sponsor_users', 'sponsor_bp.add_user', 'sponsor_bp.create_user'] %}
+                <a href="{{ url_for('sponsor_bp.list_sponsor_users') }}" class="sidebar-link {{ 'active' if request.endpoint in sponsor_driver_endpoints else '' }}">
                     Manage Drivers
                 </a>
             </li>

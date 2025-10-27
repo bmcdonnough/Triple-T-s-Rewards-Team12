@@ -2,7 +2,7 @@
 {% block title %}My Addresses - TRIPLE T's{% endblock %}
 {% block content %}
   <h1>My Shipping Addresses</h1>
-  <a href="{{ url_for('driver_bp.add_address') }}" class="btn-primary">Add New Address</a>
+  <a href="{{ url_for('driver_bp.add_address') }}" class="btn btn-primary">Add New Address</a>
   
   {% if current_user.addresses %}
     <div class="address-list">
@@ -24,7 +24,7 @@
             {% if not address.is_default %}
               <form method="POST" action="{{ url_for('driver_bp.set_default_address', address_id=address.id) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit">Set as Default</button>
+                <button type="submit" class="btn btn-primary">Set as Default</button>
               </form>
             {% endif %}
           </div>
@@ -34,4 +34,7 @@
   {% else %}
     <p>You have no saved addresses.</p>
   {% endif %}
+  <div>
+    <a href="{{ url_for('driver_bp.dashboard') }}" class="btn btn-outline">Back to Dashboard</a>
+  </div>
 {% endblock %}

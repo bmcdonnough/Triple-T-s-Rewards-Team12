@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
-from models import User, db, ImpersonationLog
+from models import User, db, ImpersonationLog, DriverSponsorAssociation
 
 
 def allowed_to_impersonate(target_user):
@@ -20,14 +20,10 @@ def allowed_to_impersonate(target_user):
             return False
 
         # Check association between sponsor and driver
-        association = db.session.execute(
-            db.text("""
-                SELECT 1 FROM DRIVER_SPONSOR_ASSOCIATIONS
-                WHERE driver_id = :driver AND sponsor_id = :sponsor
-                LIMIT 1
-            """),
-            {'driver': target_user.USER_CODE, 'sponsor': current_user.USER_CODE}
-        ).fetchone()
+        association = DriverSponsorAssociation.query.filter_by(
+            driver_id=target_user.USER_CODE,
+            sponsor_id=current_user.USER_CODE
+        ).first()
 
         return association is not None
 

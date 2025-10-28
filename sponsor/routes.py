@@ -274,6 +274,39 @@ def add_user():
     # Show the form to add a new driver
     return render_template('sponsor/add_user.html')
 
+# Sponsor Applies for Organziation
+@sponsor_bp.route('/apply_for_organization', methods=['GET', 'POST'])
+@role_required(Role.SPONSOR, allow_admin=True)
+@login_required
+def apply_for_organization():
+    """Route for sponsors to submit or update their organization details for admin approval."""
+    
+    # 1. Fetch the current Sponsor organization record using the logged-in user's ID
+    # Since they are a sponsor, this record should exist.
+    sponsor_org = Sponsor.query.get(current_user.USER_CODE)
+    
+    if request.method == 'POST':
+        # User input from the form
+        org_name = (request.form.get("org_name") or "").strip()
+
+        # Update the Organization in ORGANIZATION table
+        sponsor_org.ORG_NAME = org_name
+        
+        # Set/Reset Status to Pending if not already Approved
+        if sponsor_org.STATUS != "Approved":
+            sponsor_org.STATUS = "Pending"
+            flash("Application submitted and is now pending admin review.", "success")
+        else:
+            # If they were already approved, just update the name
+            flash("Organization details updated.", "success")
+        
+        db.session.commit()
+        
+        return redirect(url_for('sponsor_bp.dashboard'))
+
+    # Show the form, passing the existing record for pre-filling
+    return render_template('sponsor/apply_for_organization.html', sponsor=sponsor_org)
+
 def get_accepted_drivers_for_sponsor(sponsor_user_code):
     """
     Retrieves all drivers who have an 'Accepted' application status
@@ -303,7 +336,7 @@ def driver_management():
     drivers = get_accepted_drivers_for_sponsor(current_user.USER_CODE)
     return render_template('sponsor/my_organization_drivers.html', drivers=drivers)
 
-# Sponsor Application
+# Sponsor Review Applications
 @sponsor_bp.route("/applications")
 @login_required
 def review_driver_applications():
@@ -338,6 +371,7 @@ def driver_decision(app_id, decision):
     db.session.commit()
     flash(f"Driver application has been {decision}ed!", "success")
     return redirect(url_for("sponsor_bp.review_driver_applications"))
+
 # Update Contact Information
 @sponsor_bp.route('/update_info', methods=['GET', 'POST'])
 @role_required(Role.DRIVER, Role.SPONSOR, allow_admin=True, redirect_to='auth.login')

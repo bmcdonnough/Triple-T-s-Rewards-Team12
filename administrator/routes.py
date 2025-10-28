@@ -416,18 +416,30 @@ def reset_user_password(user_id):
 
 @administrator_bp.route("/sponsors")
 @login_required
+@role_required(Role.ADMINISTRATOR)
 def review_sponsors():
     sponsors = Sponsor.query.filter_by(STATUS="Pending").all()
-    return render_template("review_sponsors.html", sponsors=sponsors)
+    return render_template("administrator/review_sponsor.html", sponsors=sponsors)
 
 @administrator_bp.route("/sponsors/<int:sponsor_id>/<decision>")
 @login_required
+@role_required(Role.ADMINISTRATOR)
 def sponsor_decision(sponsor_id, decision):
     sponsor = Sponsor.query.get_or_404(sponsor_id)
-    sponsor.STATUS = "Approved" if decision == "approve" else "Rejected"
+    if decision == "approve":
+        sponsor.STATUS = "Approved"
+        # Removed: if sponsor_user: sponsor_user.IS_ACTIVE = 1 
+        flash(f"Sponsor '{sponsor.ORG_NAME}' approved!", "success") 
+    elif decision == "reject":
+        sponsor.STATUS = "Rejected"
+        # Removed: if sponsor_user: sponsor_user.IS_ACTIVE = 0
+        flash(f"Sponsor '{sponsor.ORG_NAME}' rejected.", "warning") 
+    else:
+        flash("Invalid decision.", "danger")
+        return redirect(url_for("administrator_bp.review_sponsors"))
+
     db.session.commit()
-    flash(f"Sponsor {decision}d!", "info")
-    return redirect(url_for("adminstrator_bp.review_sponsors"))
+    return redirect(url_for("administrator_bp.review_sponsors"))
 
 @administrator_bp.get("/timeouts")
 @role_required(Role.ADMINISTRATOR)

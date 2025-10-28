@@ -5,7 +5,7 @@ from common.decorators import role_required
 from common.logging import log_audit_event, DRIVER_POINTS
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
-from models import User, Role, StoreSettings, db, DriverApplication, Sponsor, Notification
+from models import User, Role, StoreSettings, db, DriverApplication, Sponsor, Notification, DriverSponsorAssociation
 from extensions import db
 import secrets
 import string
@@ -130,22 +130,45 @@ def update_settings():
 def manage_points_page():
     """Display all drivers for awarding or removing points, with search and active/inactive filtering."""
     search_query = request.args.get("search", "").strip()
-    status_filter = request.args.get("status", "").strip()  # "active" or "inactive"
+    status_filter = request.args.get("status", "").strip()
 
-    query = User.query.filter_by(USER_TYPE=Role.DRIVER)
+    # Fetch all associations for this sponsor
+    sponsor = Sponsor.query.filter_by(SPONSOR_ID=current_user.USER_CODE).first()
+    associations = DriverSponsorAssociation.query.filter_by(sponsor_id=sponsor.SPONSOR_ID).all()
 
-    # Apply exact username search (case-insensitive)
+    # Combine driver user info with their points
+    driver_data = [
+        {"user": assoc.driver.user_account, "points": assoc.points}
+        for assoc in associations
+        if assoc.driver and assoc.driver.user_account
+    ]
+
+    # Apply exact username filter (case-insensitive)
     if search_query:
-        query = query.filter(db.func.lower(User.USERNAME) == search_query.lower())
+        driver_data = [
+            d for d in driver_data
+            if getattr(d["user"], "USERNAME", "").lower() == search_query.lower()
+        ]
 
-    # Apply active/inactive filter
+    # Apply active/inactive filter directly on User objects
     if status_filter == "active":
-        query = query.filter(User.IS_ACTIVE == 1)
+        driver_data = [
+            d for d in driver_data
+            if getattr(d["user"], "IS_ACTIVE", 0) == 1
+        ]
     elif status_filter == "inactive":
-        query = query.filter(User.IS_ACTIVE == 0)
+        driver_data = [
+            d for d in driver_data
+            if getattr(d["user"], "IS_ACTIVE", 1) == 0
+        ]
 
-    drivers = query.all()
-    return render_template('sponsor/points.html', drivers=drivers)
+    # Calculate total and average points
+    total_points = sum(d["points"] for d in driver_data)
+    avg_points = round(total_points / len(driver_data), 2) if driver_data else 0
+
+    return render_template('sponsor/points.html', drivers=driver_data, total_points=total_points, avg_points=avg_points)
+
+
 
 
 @sponsor_bp.route('/points/<int:driver_id>', methods=['POST'])
@@ -168,8 +191,16 @@ def manage_points(driver_id):
         flash("Invalid request. Please provide an action (award/remove) and valid point amount.", "danger")
         return redirect(url_for('sponsor_bp.manage_points_page'))
 
+    association = DriverSponsorAssociation.query.filter_by(
+        driver_id=driver_id, sponsor_id=current_user.USER_CODE
+    ).first()
+
+    if not association:
+        flash("Driver is not associated with your organization.", "danger")
+        return redirect(url_for('sponsor_bp.manage_points_page'))
+
     if action == "award":
-        driver.POINTS += points
+        association.points += points
         db.session.commit()
 
         log_audit_event(
@@ -187,7 +218,7 @@ def manage_points(driver_id):
         flash(f"✅ Successfully awarded {points} points to {driver.USERNAME}.", "success")
 
     elif action == "remove":
-        driver.POINTS -= points
+        association.points -= points
         db.session.commit()
 
         log_audit_event(
@@ -205,6 +236,7 @@ def manage_points(driver_id):
         flash(f"⚠️ Removed {points} points from {driver.USERNAME}.", "info")
 
     return redirect(url_for('sponsor_bp.manage_points_page'))
+
 
 
 # Add a New Driver

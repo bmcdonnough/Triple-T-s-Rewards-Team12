@@ -1,62 +1,37 @@
-
 {% extends "base.html" %}
+
+{% block title %}Manage Driver Points{% endblock %}
+
 {% block styles %}
-  {{ super() }}
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
-  />
+{{ super() }}
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+/>
 {% endblock %}
+
 {% block content %}
-<main class="app-main-content container">
-  <h1>Manage Driver Points</h1>
-
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      {% for category, message in messages %}
-        <div class="flash-messages {{ category }}">{{ message }}</div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
-
-  {% if drivers %}
-    <!-- ====== Points Summary Section ====== -->
-    <section class="summary-section">
-      {% set total_points = drivers | sum(attribute='POINTS') %}
-      {% set avg_points = (total_points / (drivers|length)) | round(2) %}
-      <div class="summary-card">
-        <div class="summary-item">
-          <h3>Total Points Across All Drivers</h3>
-          <p class="summary-value">{{ total_points }}</p>
-        </div>
-        <div class="summary-item">
-          <h3>Average Points per Driver</h3>
-          <p class="summary-value">{{ avg_points }}</p>
-        </div>
+<div class="container mt-4">
+    <h2>Manage Driver Points</h2>
+    <form id="filter-form" method="GET" action="{{ url_for('sponsor_bp.manage_points_page') }}" style="display:flex; flex-direction:column; gap:.5rem; margin-bottom:1rem;">
+      <div style="display:flex; align-items:center; gap:.5rem;">
+        <input type="text" name="search" placeholder="Search by username..." value="{{ request.args.get('search', '') }}" aria-label="Search by username" class="form-control" style="flex:1;">
+        <button type="submit" class="btn btn-outline-secondary">Search</button>
+        <button id="filter-toggle" type="button" class="btn btn-outline-secondary" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center;" title="Filter options" aria-label="Filter options">
+          <i class="fa fa-filter"></i>
+        </button>
       </div>
-    </section>
 
-    <section>
-      <form id="filter-form" method="GET" action="{{ url_for('sponsor_bp.manage_points_page') }}" style="display:flex; flex-direction:column; gap:.5rem; margin-bottom:1rem;">
-        <div style="display:flex; align-items:center; gap:.5rem;">
-          <input type="text" name="search" placeholder="Search by username..." value="{{ request.args.get('search', '') }}" aria-label="Search by username" class="form-control" style="flex:1;">
-          <button type="submit" class="btn btn-outline-secondary">Search</button>
-          <button id="filter-toggle" type="button" class="btn btn-outline-secondary" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center;" title="Filter by status" aria-label="Filter by status">
-            <i class="fa fa-filter"></i>
-          </button>
-        </div>
-
-        <div id="status-filter" style="display:none; flex-wrap:wrap; gap:.5rem; background:#f7f7f7; padding:1rem; border-radius:6px;">
-          <select name="status" class="form-control" style="padding:.5rem;">
-            <option value="">All Drivers</option>
-            <option value="active" {% if request.args.get('status') == 'active' %}selected{% endif %}>Active</option>
-            <option value="inactive" {% if request.args.get('status') == 'inactive' %}selected{% endif %}>Inactive</option>
-          </select>
-          <button type="submit" class="btn btn-outline-secondary">Apply</button>
-          <a href="{{ url_for('sponsor_bp.manage_points_page') }}" class="btn btn-outline-secondary">Reset</a>
-        </div>
-      </form>
-    </section>
+      <div id="status-filter" style="display:none; flex-wrap:wrap; gap:.5rem; background:#f7f7f7; padding:1rem; border-radius:6px;">
+        <select name="status" class="form-control" style="padding:.5rem;">
+          <option value="">All Drivers</option>
+          <option value="active" {% if request.args.get('status') == 'active' %}selected{% endif %}>Active</option>
+          <option value="inactive" {% if request.args.get('status') == 'inactive' %}selected{% endif %}>Inactive</option>
+        </select>
+        <button type="submit" class="btn btn-outline-secondary">Apply</button>
+        <a href="{{ url_for('sponsor_bp.manage_points_page') }}" class="btn btn-outline-secondary">Reset</a>
+      </div>
+    </form>
 
     <script>
       document.addEventListener('DOMContentLoaded', function() {
@@ -68,80 +43,59 @@
       });
     </script>
 
-    <!-- ====== Driver Table ====== -->
-    <section class="data-section">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Driver</th>
-            <th>Current Points</th>
-            <th>Award Points</th>
-            <th>Remove Points</th>
-          </tr>
+    <div class="mb-4" style="display:flex; gap:2rem; justify-content:flex-start; align-items:center;">
+      <div style="background:#474B4F; padding:1rem 2rem; border-radius:8px; font-size:1.3rem; font-weight:600; color:#86C232; box-shadow:0 2px 6px rgba(0,0,0,0.15);">
+          <i class="fa-solid fa-star" style="color:#86C232;"></i> 
+          Total Points: <span style="color:#ffffff;">{{ total_points }}</span>
+      </div>
+      <div style="background:#474B4F; padding:1rem 2rem; border-radius:8px; font-size:1.3rem; font-weight:600; color:#86C232; box-shadow:0 2px 6px rgba(0,0,0,0.15);">
+          <i class="fa-solid fa-chart-line" style="color:#86C232;"></i> 
+          Average Points per Driver: <span style="color:#ffffff;">{{ avg_points }}</span>
+      </div>
+    </div>
+
+    {% if drivers %}
+    <table class="table table-striped table-hover">
+        <thead class="thead-dark">
+            <tr>
+                <th>Driver Name</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Current Points</th>
+                <th>Action</th>
+            </tr>
         </thead>
         <tbody>
-          {% for driver in drivers %}
-          <tr>
-            <td>{{ driver.USERNAME }}</td>
-            <td>{{ driver.POINTS }}</td>
-
-            <!-- Award form -->
-            <td>
-              <form
-                method="POST"
-                action="{{ url_for('sponsor_bp.manage_points', driver_id=driver.USER_CODE) }}"
-                class="points-form"
-              >
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="action" value="award">
-                <input
-                  type="number"
-                  name="points"
-                  min="1"
-                  class="input-field compact"
-                  placeholder="Points"
-                  required
-                >
-                <button type="submit" class="btn btn-primary">Award</button>
-              </form>
-            </td>
-
-            <!-- Remove form -->
-            <td>
-              <form
-                method="POST"
-                action="{{ url_for('sponsor_bp.manage_points', driver_id=driver.USER_CODE) }}"
-                class="points-form"
-              >
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="action" value="remove">
-                <input
-                  type="number"
-                  name="points"
-                  min="1"
-                  class="input-field compact"
-                  placeholder="Points"
-                  required
-                >
-                <input
-                  type="text"
-                  name="reason"
-                  class="input-field compact"
-                  placeholder="Reason (optional)"
-                >
-                <button type="submit" class="btn btn-outline">Remove</button>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
+            {% for driver in drivers %}
+            <tr>
+                <td>{{ driver.user.FNAME }} {{ driver.user.LNAME }}</td>
+                <td>{{ driver.user.USERNAME }}</td>
+                <td>{{ driver.user.EMAIL }}</td>
+                <td><span class="badge bg-primary">{{ driver.points }}</span></td>
+                <td>
+                  <form action="{{ url_for('sponsor_bp.manage_points', driver_id=driver.user.USER_CODE) }}" method="post" class="form-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="form-group mb-2 mr-sm-2">
+                            <input type="number" name="points" class="form-control" placeholder="Points" required min="1">
+                        </div>
+                        <div class="form-group mb-2 mr-sm-2">
+                            <select name="action" class="form-control">
+                                <option value="award">Award</option>
+                                <option value="remove">Remove</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-2 mr-sm-2">
+                            <input type="text" name="reason" class="form-control" placeholder="Reason (if removing)">
+                        </div>
+                        <button type="submit" class="btn btn-primary mb-2">Submit</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
         </tbody>
-      </table>
-    </section>
-  {% else %}
-    <p class="text-muted">No drivers found.</p>
-  {% endif %}
-
-  <div class="spacer"></div>
-  <a href="{{ url_for('sponsor_bp.dashboard') }}" class="btn btn-outline">← Back to Dashboard</a>
-</main>
+    </table>
+    {% else %}
+    <p>There are no drivers currently associated with your organization.</p>
+    {% endif %}
+</div>
 {% endblock %}

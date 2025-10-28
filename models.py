@@ -1,4 +1,3 @@
-# triple-ts-rewards/triple-t-s-rewards/Triple-T-s-Rewards-72ca7a46f1915a7f669f3692e9b77d23b248eaee/models.py
 from datetime import datetime, timedelta
 from extensions import db, login_manager
 from extensions import bcrypt
@@ -49,7 +48,6 @@ class User(db.Model, UserMixin):
     LNAME = db.Column(db.String(50), nullable=False)
     EMAIL = db.Column(db.String(100), nullable=False)
     CREATED_AT = db.Column(db.DateTime, nullable=False)
-    POINTS = db.Column(db.Integer, default=0, nullable=False)
     PHONE = db.Column(db.String(15), nullable=True)
     LOCKED_REASON = db.Column(db.String(100), nullable=True)
     wants_point_notifications = db.Column(db.Boolean, default=True, nullable=False)
@@ -58,7 +56,9 @@ class User(db.Model, UserMixin):
     TOTP_ENABLED = db.Column(db.Boolean, default=False, nullable=False)
     addresses = db.relationship('Address', backref='user', lazy=True, cascade="all, delete-orphan")
     wishlist_items = db.relationship('WishlistItem', backref='user', lazy=True, cascade="all, delete-orphan")
-    sponsor = db.relationship('Sponsor', backref='user', uselist=False, cascade="all, delete-orphan")
+    # sponsor = db.relationship('Sponsor', backref='user', uselist=False, cascade="all, delete-orphan")
+    driver_profile = db.relationship("Driver", back_populates="user_account", uselist=False)
+    sponsor_profile = db.relationship("Sponsor", back_populates="user_account", uselist=False)
 
     #User account
     IS_ACTIVE = db.Column(db.Integer, nullable=False)
@@ -131,17 +131,51 @@ class User(db.Model, UserMixin):
         return str(self.USER_CODE)
 
 class Driver(db.Model):
-    __tablename__ = 'DRIVERS'
-    DRIVER_ID = db.Column(db.Integer, db.ForeignKey("USERS.USER_CODE", ondelete="CASCADE"), primary_key=True)
-    LICENSE_NUMBER = db.Column(db.String(50), nullable=False)
-    applications = db.relationship("DriverApplication", back_populates="driver")
+    __tablename__ = "DRIVERS"
+
+    # DRIVER_ID acts as both PK and FK → USERS.USER_CODE
+    DRIVER_ID = db.Column(db.Integer, db.ForeignKey("USERS.USER_CODE"), primary_key=True)
+    LICENSE_NUMBER = db.Column(db.String(50))
+
+    user_account = db.relationship("User", back_populates="driver_profile")
+
+    sponsor_associations = db.relationship(
+        "DriverSponsorAssociation",
+        back_populates="driver",
+        cascade="all, delete-orphan"
+    )
+
+    applications = db.relationship(
+        "DriverApplication",
+        back_populates="driver",
+        cascade="all, delete-orphan"
+    )
+
+
 
 class Sponsor(db.Model):
     __tablename__ = "SPONSORS"
-    SPONSOR_ID = db.Column(db.Integer, db.ForeignKey("USERS.USER_CODE", ondelete="CASCADE"), primary_key=True)
-    ORG_NAME = db.Column(db.String(100), nullable=False)
-    STATUS = db.Column(db.Enum("Pending", "Approved", "Rejected", name="SPONSOR_STATUS"), default="Pending")
-    applications = db.relationship("DriverApplication", back_populates="sponsor")
+
+    # SPONSOR_ID now acts as both PK and FK → USERS.USER_CODE
+    SPONSOR_ID = db.Column(db.Integer, db.ForeignKey("USERS.USER_CODE"), primary_key=True)
+    ORG_NAME = db.Column(db.String(100))
+    STATUS = db.Column(db.String(50))
+
+    user_account = db.relationship("User", back_populates="sponsor_profile")
+
+    driver_associations = db.relationship(
+        "DriverSponsorAssociation",
+        back_populates="sponsor",
+        cascade="all, delete-orphan"
+    )
+
+    applications = db.relationship(
+        "DriverApplication",
+        back_populates="sponsor",
+        cascade="all, delete-orphan"
+    )
+
+
 
 class Admin(db.Model):
     __tablename__ = "ADMIN"
@@ -158,6 +192,18 @@ class DriverApplication(db.Model):
     APPLIED_AT = db.Column(db.DateTime, server_default=db.func.now())
     driver = db.relationship("Driver", back_populates="applications")
     sponsor = db.relationship("Sponsor", back_populates="applications")
+
+class DriverSponsorAssociation(db.Model):
+    __tablename__ = "DRIVER_SPONSOR_ASSOCIATION"
+
+    driver_id = db.Column(db.Integer, db.ForeignKey("DRIVERS.DRIVER_ID"), primary_key=True)
+    sponsor_id = db.Column(db.Integer, db.ForeignKey("SPONSORS.SPONSOR_ID"), primary_key=True)
+    points = db.Column(db.Integer, default=0)
+
+    driver = db.relationship("Driver", back_populates="sponsor_associations")
+    sponsor = db.relationship("Sponsor", back_populates="driver_associations")
+
+
 
 class StoreSettings(db.Model):
     __tablename__ = 'STORE_SETTINGS'

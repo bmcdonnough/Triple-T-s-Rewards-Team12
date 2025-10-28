@@ -4,6 +4,10 @@
 
 {% block styles %}
   {{ super() }} {# Ensure theme.css + style.css are included #}
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+  />
 {% endblock %}
 
 {% block content %}
@@ -35,6 +39,37 @@
         </a>
         <h1 style="margin:0;">Inactive Users</h1>
       </div>
+
+      <form id="filter-form" method="GET" action="{{ url_for('administrator_bp.disabled_accounts') }}" style="display:flex; flex-direction:column; gap:.5rem; margin-bottom:1rem;">
+        <div style="display:flex; align-items:center; gap:.5rem;">
+          <input type="text" name="search" placeholder="Search by username..." value="{{ request.args.get('search', '') }}" aria-label="Search by username" class="input" style="flex:1; padding:.5rem;">
+          <button type="submit" class="btn btn-outline">Search</button>
+          <button id="filter-toggle" type="button" class="btn btn-outline" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center;" title="Filter by role" aria-label="Filter by role">
+            <i class="fa fa-filter"></i>
+          </button>
+        </div>
+
+        <div id="role-filter" style="display:none; flex-wrap:wrap; gap:.5rem; background:#f7f7f7; padding:1rem; border-radius:6px;">
+          <select name="role" class="input" style="padding:.5rem;">
+            <option value="">All Roles</option>
+            <option value="admin" {% if request.args.get('role') == 'admin' %}selected{% endif %}>Admin</option>
+            <option value="sponsor" {% if request.args.get('role') == 'sponsor' %}selected{% endif %}>Sponsor</option>
+            <option value="driver" {% if request.args.get('role') == 'driver' %}selected{% endif %}>Driver</option>
+          </select>
+          <button type="submit" class="btn btn-outline">Apply</button>
+          <a href="{{ url_for('administrator_bp.disabled_accounts') }}" class="btn btn-outline">Reset</a>
+        </div>
+      </form>
+
+      <script>
+        document.addEventListener('DOMContentLoaded', function() {
+          const toggle = document.getElementById('filter-toggle');
+          const roleSection = document.getElementById('role-filter');
+          toggle.addEventListener('click', () => {
+            roleSection.style.display = roleSection.style.display === 'none' ? 'flex' : 'none';
+          });
+        });
+      </script>
 
       {% if accounts %}
         <table aria-describedby="inactive-users-caption">

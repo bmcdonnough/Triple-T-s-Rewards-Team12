@@ -1,4 +1,12 @@
+
 {% extends "base.html" %}
+{% block styles %}
+  {{ super() }}
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+  />
+{% endblock %}
 {% block content %}
 <main class="app-main-content container">
   <h1>Manage Driver Points</h1>
@@ -27,6 +35,38 @@
         </div>
       </div>
     </section>
+
+    <section>
+      <form id="filter-form" method="GET" action="{{ url_for('sponsor_bp.manage_points_page') }}" style="display:flex; flex-direction:column; gap:.5rem; margin-bottom:1rem;">
+        <div style="display:flex; align-items:center; gap:.5rem;">
+          <input type="text" name="search" placeholder="Search by username..." value="{{ request.args.get('search', '') }}" aria-label="Search by username" class="form-control" style="flex:1;">
+          <button type="submit" class="btn btn-outline-secondary">Search</button>
+          <button id="filter-toggle" type="button" class="btn btn-outline-secondary" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center;" title="Filter by status" aria-label="Filter by status">
+            <i class="fa fa-filter"></i>
+          </button>
+        </div>
+
+        <div id="status-filter" style="display:none; flex-wrap:wrap; gap:.5rem; background:#f7f7f7; padding:1rem; border-radius:6px;">
+          <select name="status" class="form-control" style="padding:.5rem;">
+            <option value="">All Drivers</option>
+            <option value="active" {% if request.args.get('status') == 'active' %}selected{% endif %}>Active</option>
+            <option value="inactive" {% if request.args.get('status') == 'inactive' %}selected{% endif %}>Inactive</option>
+          </select>
+          <button type="submit" class="btn btn-outline-secondary">Apply</button>
+          <a href="{{ url_for('sponsor_bp.manage_points_page') }}" class="btn btn-outline-secondary">Reset</a>
+        </div>
+      </form>
+    </section>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const toggle = document.getElementById('filter-toggle');
+        const statusSection = document.getElementById('status-filter');
+        toggle.addEventListener('click', () => {
+          statusSection.style.display = statusSection.style.display === 'none' ? 'flex' : 'none';
+        });
+      });
+    </script>
 
     <!-- ====== Driver Table ====== -->
     <section class="data-section">

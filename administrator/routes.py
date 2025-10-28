@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response
 from flask_login import login_user, logout_user, login_required, current_user
 from common.decorators import role_required
-from models import User, Role, AuditLog
+from models import User, Role, AuditLog, Driver, Sponsor, Admin
 from extensions import db
 from sqlalchemy import or_
 from common.logging import (LOGIN_EVENT,
@@ -301,14 +301,33 @@ def unlock_all():
     flash('All locked accounts have been unlocked.', 'success')
     return redirect(url_for('administrator_bp.locked_users'))
 
-@administrator_bp.route('/accounts', methods=['GET'])
+@administrator_bp.route("/accounts")
+@login_required
 def accounts():
-    users = User.query.filter_by(IS_ACTIVE=1).all()
-    return render_template('administrator/accounts.html', accounts=users)
+    search_query = request.args.get("search", "").strip()
+    role_filter = request.args.get("role", "").strip()
+
+    query = User.query
+    if search_query:
+        query = query.filter(User.USERNAME.ilike(f"%{search_query}%"))
+    if role_filter:
+        query = query.filter(User.USER_TYPE == role_filter)
+
+    accounts = query.order_by(User.USER_TYPE).all()
+    return render_template("administrator/accounts.html", accounts=accounts)
 
 @administrator_bp.route('/disabled_accounts', methods=['GET'])
 def disabled_accounts():
-    users = User.query.filter_by(IS_ACTIVE=0).all()
+    search_query = request.args.get("search", "").strip()
+    role_filter = request.args.get("role", "").strip()
+
+    query = User.query.filter_by(IS_ACTIVE=0)
+    if search_query:
+        query = query.filter(User.USERNAME.ilike(f"%{search_query}%"))
+    if role_filter:
+        query = query.filter(User.USER_TYPE == role_filter)
+
+    users = query.order_by(User.USER_TYPE).all()
     return render_template('administrator/disabled_accounts.html', accounts=users)
 
 

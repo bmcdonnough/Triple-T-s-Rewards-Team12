@@ -127,10 +127,24 @@ def update_settings():
 @sponsor_bp.route('/points', methods=['GET'])
 @role_required(Role.SPONSOR, allow_admin=True)
 def manage_points_page():
-    """Display all drivers for awarding or removing points."""
-    # This query now fetches the association objects directly
-    associations = DriverSponsorAssociation.query.filter_by(sponsor_id=current_user.USER_CODE).all()
-    return render_template('sponsor/points.html', associations=associations)
+    """Display all drivers for awarding or removing points, with search and active/inactive filtering."""
+    search_query = request.args.get("search", "").strip()
+    status_filter = request.args.get("status", "").strip()  # "active" or "inactive"
+
+    query = User.query.filter_by(USER_TYPE=Role.DRIVER)
+
+    # Apply exact username search (case-insensitive)
+    if search_query:
+        query = query.filter(db.func.lower(User.USERNAME) == search_query.lower())
+
+    # Apply active/inactive filter
+    if status_filter == "active":
+        query = query.filter(User.IS_ACTIVE == 1)
+    elif status_filter == "inactive":
+        query = query.filter(User.IS_ACTIVE == 0)
+
+    drivers = query.all()
+    return render_template('sponsor/points.html', drivers=drivers)
 
 
 @sponsor_bp.route('/points/<int:driver_id>', methods=['POST'])

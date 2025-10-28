@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response
 from flask_login import login_user, logout_user, login_required, current_user
 from common.decorators import role_required
-from models import User, Role, AuditLog
+from models import User, Role, AuditLog, Driver
 from extensions import db
 from sqlalchemy import or_
 from common.logging import (LOGIN_EVENT,

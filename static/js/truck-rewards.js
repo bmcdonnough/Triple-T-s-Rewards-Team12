@@ -1,6 +1,21 @@
-async function loadProducts(query = '', minPrice = '', maxPrice = '') {
+function initializeStore(sponsorId) {
+  loadProducts(sponsorId); 
+
+  const searchForm = document.getElementById('search-form');
+  if (searchForm) {
+    searchForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const searchInput = document.getElementById('search-input');
+      const minPriceInput = document.getElementById('min-price');
+      const maxPriceInput = document.getElementById('max-price');
+      loadProducts(sponsorId, searchInput.value, minPriceInput.value, maxPriceInput.value);
+    });
+  }
+}
+
+async function loadProducts(sponsorId, query = '', minPrice = '', maxPrice = '') {
   try {
-    let url = `/truck-rewards/products?q=${encodeURIComponent(query)}`;
+    let url = `/truck-rewards/products/${sponsorId}?q=${encodeURIComponent(query)}`;
     if (minPrice) url += `&min_price=${encodeURIComponent(minPrice)}`;
     if (maxPrice) url += `&max_price=${encodeURIComponent(maxPrice)}`;
 
@@ -10,8 +25,13 @@ async function loadProducts(query = '', minPrice = '', maxPrice = '') {
     const container = document.getElementById("products");
     container.innerHTML = "";
 
+    if (products.error) {
+      container.innerHTML = `<p>Error loading products: ${products.error}</p>`;
+      return;
+    }
+
     if (products.length === 0) {
-      container.innerHTML = "<p>No products found matching your criteria.</p>";
+      container.innerHTML = "<p>No products found in this sponsor's store.</p>";
       return;
     }
 
@@ -19,8 +39,8 @@ async function loadProducts(query = '', minPrice = '', maxPrice = '') {
       const card = document.createElement("div");
       card.className = "product-card";
       const imageUrl = p.image || 'https://i.ebayimg.com/images/g/placeholder/s-l225.jpg';
-      
-      const productData = JSON.stringify(p);
+
+      const productData = JSON.stringify(p).replace(/'/g, "&apos;");
 
       card.innerHTML = `
         <img src="${imageUrl}" alt="${p.title}">
@@ -34,26 +54,28 @@ async function loadProducts(query = '', minPrice = '', maxPrice = '') {
     });
   } catch (err) {
     console.error("Error loading products:", err);
-    container.innerHTML = "<p>Error loading products.</p>";
+    const container = document.getElementById("products");
+    container.innerHTML = "<p>A network error occurred while trying to load products.</p>";
   }
 }
 
-async function addToCart(productData) {
+async function addToCart(productData, sponsorId) {
   try {
     const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+
+    const dataToSend = { ...productData, sponsor_id: sponsorId };
 
     const response = await fetch('/truck-rewards/add_to_cart', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'X-CSRFToken': csrfToken 
+        'X-CSRFToken': csrfToken
       },
-      body: new URLSearchParams(productData)
+      body: new URLSearchParams(dataToSend)
     });
 
     if (response.ok) {
       alert(`'${productData.title}' was added to your cart!`);
-      fetchCartCount();
     } else {
       throw new Error('Failed to add item to cart.');
     }
@@ -71,7 +93,7 @@ async function addToWishlist(productData) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'X-CSRFToken': csrfToken 
+        'X-CSRFToken': csrfToken
       },
       body: new URLSearchParams(productData)
     });
@@ -85,26 +107,16 @@ async function addToWishlist(productData) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  loadProducts();
-
-  const searchForm = document.getElementById('search-form');
-  if (searchForm) {
-    searchForm.addEventListener('submit', (event) => {
-      event.preventDefault();
-      const searchInput = document.getElementById('search-input');
-      const minPriceInput = document.getElementById('min-price');
-      const maxPriceInput = document.getElementById('max-price');
-      loadProducts(searchInput.value, minPriceInput.value, maxPriceInput.value);
-    });
-  }
-
   document.getElementById('products').addEventListener('click', (event) => {
     if (event.target && event.target.classList.contains('add-to-cart-btn')) {
-      const productData = JSON.parse(event.target.dataset.product);
-      addToCart(productData);
+      const productData = JSON.parse(event.target.dataset.product.replace(/&apos;/g, "'"));
+
+      const sponsorId = document.getElementById('sponsor_id').value;
+      
+      addToCart(productData, sponsorId);
     }
     if (event.target && event.target.classList.contains('add-to-wishlist-btn')) {
-      const productData = JSON.parse(event.target.dataset.product);
+      const productData = JSON.parse(event.target.dataset.product.replace(/&apos;/g, "'"));
       addToWishlist(productData);
     }
   });

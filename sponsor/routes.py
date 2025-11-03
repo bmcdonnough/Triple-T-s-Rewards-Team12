@@ -6,10 +6,9 @@ from common.logging import log_audit_event, DRIVER_POINTS
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 from models import User, Role, StoreSettings, db, DriverApplication, Sponsor, Notification
-from extensions import db
+from extensions import db, bcrypt
 import secrets
 import string
-import bcrypt
 
 # Blueprint for sponsor-related routes
 sponsor_bp = Blueprint('sponsor_bp', __name__, template_folder="../templates")
@@ -351,6 +350,60 @@ def update_info():
             return redirect(url_for('sponsor_bp.update_info'))
 
     return render_template('sponsor/update_info.html', user=current_user, sponsor=sponsor)
+
+# Reset Driver Password
+@sponsor_bp.route('/reset_driver_password/<int:driver_id>', methods=['POST'])
+@role_required(Role.SPONSOR, allow_admin=True)
+def reset_driver_password(driver_id):
+    """Reset a driver's password to a temporary password"""
+    # Get the sponsor record to verify organization
+    sponsor = Sponsor.query.filter_by(USER_CODE=current_user.USER_CODE).first()
+    if not sponsor:
+        flash("Sponsor record not found.", "danger")
+        return redirect(url_for('sponsor_bp.driver_management'))
+    
+    # Get the driver
+    driver = User.query.get_or_404(driver_id)
+    
+    # Verify the driver belongs to this sponsor's organization
+    driver_app = DriverApplication.query.filter_by(
+        DRIVER_ID=driver.USER_CODE, 
+        ORG_ID=sponsor.ORG_ID, 
+        STATUS="Accepted"
+    ).first()
+    
+    if not driver_app:
+        flash("You can only reset passwords for drivers in your organization.", "danger")
+        return redirect(url_for('sponsor_bp.driver_management'))
+    
+    try:
+        # Generate a new temporary password using the User model's method
+        temp_password = driver.admin_set_new_pass()
+        
+        db.session.commit()
+        
+        # Log the event
+        log_audit_event(
+            "PASSWORD_RESET_BY_SPONSOR",
+            f"Sponsor {current_user.USERNAME} reset password for driver {driver.USERNAME}"
+        )
+        
+        # Send notification to driver if they want security notifications
+        if getattr(driver, "wants_security_notifications", True):
+            Notification.create_notification(
+                recipient_code=driver.USER_CODE,
+                sender_code=current_user.USER_CODE,
+                message=f"Your password has been reset by {current_user.USERNAME}. Please log in with your new temporary password and change it immediately."
+            )
+        
+        flash(f"✅ Password reset successfully for {driver.USERNAME}. Temporary password: {temp_password}", "success")
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error resetting password: {str(e)}")  # For debugging
+        flash(f"An error occurred while resetting the password: {str(e)}", "danger")
+    
+    return redirect(url_for('sponsor_bp.driver_management'))
 
 # Update Password
 @sponsor_bp.route('/change_password', methods=['GET', 'POST'])

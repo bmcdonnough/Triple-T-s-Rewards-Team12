@@ -221,6 +221,7 @@ class BulkLoadProcessor:
                 POINTS=0,
                 wants_point_notifications=True,
                 wants_order_notifications=True,
+                wants_security_notifications=True,
                 IS_ACTIVE=1,
                 FAILED_ATTEMPTS=0,
                 IS_LOCKED_OUT=0
@@ -293,6 +294,7 @@ class BulkLoadProcessor:
                 POINTS=0,
                 wants_point_notifications=True,
                 wants_order_notifications=True,
+                wants_security_notifications=True,
                 IS_ACTIVE=1,
                 FAILED_ATTEMPTS=0,
                 IS_LOCKED_OUT=0
@@ -444,9 +446,9 @@ class BulkLoadProcessor:
                 LNAME=last_name,
                 EMAIL=email,
                 CREATED_AT=datetime.now(),
-                POINTS=0,
                 wants_point_notifications=True,
                 wants_order_notifications=True,
+                wants_security_notifications=True,
                 IS_ACTIVE=1,
                 FAILED_ATTEMPTS=0,
                 IS_LOCKED_OUT=0
@@ -525,9 +527,9 @@ class BulkLoadProcessor:
                 LNAME=last_name,
                 EMAIL=email,
                 CREATED_AT=datetime.now(),
-                POINTS=0,
                 wants_point_notifications=True,
                 wants_order_notifications=True,
+                wants_security_notifications=True,
                 IS_ACTIVE=1,
                 FAILED_ATTEMPTS=0,
                 IS_LOCKED_OUT=0

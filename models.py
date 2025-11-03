@@ -135,7 +135,7 @@ class Driver(db.Model):
     __tablename__ = 'DRIVERS'
     DRIVER_ID = db.Column(db.Integer, db.ForeignKey("USERS.USER_CODE", ondelete="CASCADE"), primary_key=True)
     LICENSE_NUMBER = db.Column(db.String(50), nullable=False)
-    points = db.Column(db.Integer, default=0, nullable=False)
+    # points = db.Column(db.Integer, default=0, nullable=False)
     applications = db.relationship("DriverApplication", back_populates="driver")
 
 class Sponsor(db.Model):

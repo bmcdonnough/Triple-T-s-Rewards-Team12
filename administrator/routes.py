@@ -9,7 +9,7 @@ from common.logging import (LOGIN_EVENT,
     DRIVER_POINTS)
 from common.logging import (LOGIN_EVENT, SALES_BY_SPONSOR, SALES_BY_DRIVER, INVOICE_EVENT, DRIVER_POINTS, log_audit_event)
 from datetime import datetime, timedelta
-from models import db, Sponsor
+from models import db, Sponsor, Driver, Admin
 import csv
 from io import StringIO
 

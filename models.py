@@ -49,11 +49,12 @@ class User(db.Model, UserMixin):
     LNAME = db.Column(db.String(50), nullable=False)
     EMAIL = db.Column(db.String(100), nullable=False)
     CREATED_AT = db.Column(db.DateTime, nullable=False)
-    POINTS = db.Column(db.Integer, default=0, nullable=False)
+    
     PHONE = db.Column(db.String(15), nullable=True)
     LOCKED_REASON = db.Column(db.String(100), nullable=True)
     wants_point_notifications = db.Column(db.Boolean, default=True, nullable=False)
     wants_order_notifications = db.Column(db.Boolean, default=True, nullable=False)
+    wants_security_notifications = db.Column(db.Boolean, default=True, nullable=False)
     TOTP_SECRET = db.Column(db.String(16), nullable=True)
     TOTP_ENABLED = db.Column(db.Boolean, default=False, nullable=False)
     addresses = db.relationship('Address', backref='user', lazy=True, cascade="all, delete-orphan")
@@ -134,6 +135,7 @@ class Driver(db.Model):
     __tablename__ = 'DRIVERS'
     DRIVER_ID = db.Column(db.Integer, db.ForeignKey("USERS.USER_CODE", ondelete="CASCADE"), primary_key=True)
     LICENSE_NUMBER = db.Column(db.String(50), nullable=False)
+    points = db.Column(db.Integer, default=0, nullable=False)
     applications = db.relationship("DriverApplication", back_populates="driver")
 
 class Sponsor(db.Model):

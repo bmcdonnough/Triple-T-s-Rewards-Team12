@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from common.decorators import role_required
 from common.logging import DRIVER_POINTS, log_audit_event, LOGIN_EVENT
-from models import Role, AuditLog, User, db, Sponsor, DriverApplication, Address, StoreSettings, Driver, Notification, LOCKOUT_ATTEMPTS
+from models import Role, AuditLog, User, db, Sponsor, DriverApplication, Address, StoreSettings, Driver, Notification, LOCKOUT_ATTEMPTS, Organization
 from extensions import bcrypt
 from datetime import datetime
 
@@ -211,26 +211,26 @@ def change_password():
 @driver_bp.route("/driver_app", methods=["GET", "POST"])
 @login_required
 def apply_driver():
-    sponsors = Sponsor.query.filter_by(STATUS="Approved").all()
+    # Get all organizations that have approved sponsors
+    organizations = Organization.query.join(Sponsor).filter(Sponsor.STATUS == "Approved").all()
 
     if request.method == "POST":
-        sponsor_id = request.form["sponsor_id"]
+        org_id = request.form["org_id"]
         reason = request.form.get("reason", "")
 
         existing = DriverApplication.query.filter_by(
             DRIVER_ID=current_user.USER_CODE,
-            SPONSOR_ID=sponsor_id
+            ORG_ID=org_id
         ).first()
 
         if existing:
-            flash("You already applied to this sponsor.", "warning")
+            flash("You already applied to this organization.", "warning")
         else:
             application = DriverApplication(
                 DRIVER_ID=current_user.USER_CODE,
-                SPONSOR_ID=sponsor_id,
+                ORG_ID=org_id,
                 REASON=reason,
-                STATUS="Pending",
-                LICENSE_NUMBER=current_user.LICENSE_NUMBER if current_user else None
+                STATUS="Pending"
             )
             db.session.add(application)
             db.session.commit()
@@ -238,7 +238,7 @@ def apply_driver():
 
         return redirect(url_for("driver_bp.dashboard"))
 
-    return render_template("driver/driver_app.html", sponsors=sponsors)
+    return render_template("driver/driver_app.html", organizations=organizations)
 
 # Address Management
 @driver_bp.route('/addresses')

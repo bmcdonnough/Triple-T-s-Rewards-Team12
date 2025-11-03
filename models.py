@@ -140,10 +140,10 @@ class Driver(db.Model):
 
 class Sponsor(db.Model):
     __tablename__ = "SPONSORS"
-    SPONSOR_ID = db.Column(db.Integer, db.ForeignKey("USERS.USER_CODE", ondelete="CASCADE"), primary_key=True)
-    ORG_NAME = db.Column(db.String(100), nullable=False)
+    USER_CODE = db.Column(db.Integer, db.ForeignKey("USERS.USER_CODE", ondelete="CASCADE"), primary_key=True)
+    ORG_ID = db.Column(db.Integer, db.ForeignKey("ORGANIZATIONS.ORG_ID", ondelete="CASCADE"), nullable=False)
     STATUS = db.Column(db.Enum("Pending", "Approved", "Rejected", name="SPONSOR_STATUS"), default="Pending")
-    applications = db.relationship("DriverApplication", back_populates="sponsor")
+    organization = db.relationship("Organization", backref="sponsors")
 
 class Admin(db.Model):
     __tablename__ = "ADMIN"
@@ -154,12 +154,12 @@ class DriverApplication(db.Model):
     __tablename__ = "DRIVER_APPLICATIONS"
     APPLICATION_ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
     DRIVER_ID = db.Column(db.Integer, db.ForeignKey("DRIVERS.DRIVER_ID", ondelete="CASCADE"))
-    SPONSOR_ID = db.Column(db.Integer, db.ForeignKey("SPONSORS.SPONSOR_ID", ondelete="CASCADE"))
+    ORG_ID = db.Column(db.Integer, db.ForeignKey("ORGANIZATIONS.ORG_ID", ondelete="CASCADE"))
     STATUS = db.Column(db.Enum("Pending", "Accepted", "Rejected", name="DRIVER_APPLICATION_STATUS"), default="Pending")
     REASON = db.Column(db.String(255))
     APPLIED_AT = db.Column(db.DateTime, server_default=db.func.now())
     driver = db.relationship("Driver", back_populates="applications")
-    sponsor = db.relationship("Sponsor", back_populates="applications")
+    organization = db.relationship("Organization", backref="driver_applications")
 
 class StoreSettings(db.Model):
     __tablename__ = 'STORE_SETTINGS'

@@ -14,8 +14,8 @@ import bcrypt
 # Blueprint for sponsor-related routes
 sponsor_bp = Blueprint('sponsor_bp', __name__, template_folder="../templates")
 
-def driver_query_for_sponsor(sponsor_id):
-    return db.session.query(User).filter(User.USER_TYPE == Role.DRIVER, User.SPONSOR_ID == sponsor_id).all()
+def driver_query_for_sponsor(organization_id):
+    return db.session.query(User).filter(User.USER_TYPE == Role.DRIVER, User.ORG_ID == organization_id).all()
 
 def next_user_code():
     last_user = User.query.order_by(User.USER_CODE.desc()).first()
@@ -244,14 +244,14 @@ def add_user():
     # Show the form to add a new driver
     return render_template('sponsor/add_user.html')
 
-def get_accepted_drivers_for_sponsor(sponsor_user_code):
+def get_accepted_drivers_for_sponsor(org_id):
     """
     Retrieves all drivers who have an 'Accepted' application status 
-    with the given sponsor_user_code using a two-step query for stability.
+    with the given organization ID using a two-step query for stability.
     """
-    # Step 1: Filter the DriverApplication table for accepted apps for this sponsor
+    # Step 1: Filter the DriverApplication table for accepted apps for this organization
     accepted_apps = DriverApplication.query.filter(
-        DriverApplication.SPONSOR_ID == sponsor_user_code,
+        DriverApplication.ORG_ID == org_id,
         DriverApplication.STATUS == "Accepted" 
     ).all()
 
@@ -270,14 +270,26 @@ def get_accepted_drivers_for_sponsor(sponsor_user_code):
 @sponsor_bp.route('/drivers', methods=['GET'])
 @role_required(Role.SPONSOR, allow_admin=True)
 def driver_management():
-    drivers = get_accepted_drivers_for_sponsor(current_user.USER_CODE)
+    # Get the sponsor record to access ORG_ID
+    sponsor = Sponsor.query.filter_by(USER_CODE=current_user.USER_CODE).first()
+    if not sponsor:
+        flash("Sponsor record not found.", "danger")
+        return redirect(url_for('sponsor_bp.dashboard'))
+    
+    drivers = get_accepted_drivers_for_sponsor(sponsor.ORG_ID)
     return render_template('sponsor/my_organization_drivers.html', drivers=drivers)
 
 # Sponsor Application
 @sponsor_bp.route("/applications")
 @login_required
 def review_driver_applications():
-    apps = DriverApplication.query.filter_by(SPONSOR_ID=current_user.USER_CODE, STATUS="Pending").all()
+    # Get the sponsor record to access ORG_ID
+    sponsor = Sponsor.query.filter_by(USER_CODE=current_user.USER_CODE).first()
+    if not sponsor:
+        flash("Sponsor record not found.", "danger")
+        return redirect(url_for('sponsor_bp.dashboard'))
+    
+    apps = DriverApplication.query.filter_by(ORG_ID=sponsor.ORG_ID, STATUS="Pending").all()
     return render_template("sponsor/review_driver_applications.html", applications=apps)
 
 @sponsor_bp.route("/applications/<int:app_id>/<decision>")

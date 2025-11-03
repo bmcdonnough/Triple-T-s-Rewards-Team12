@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from common.decorators import role_required
 from common.logging import DRIVER_POINTS, log_audit_event, LOGIN_EVENT
-from models import Role, AuditLog, User, db, Sponsor, DriverApplication, Address, StoreSettings, Driver, Notification, LOCKOUT_ATTEMPTS, Organization
+from models import Role, AuditLog, User, db, Sponsor, DriverApplication, Address, StoreSettings, Driver, Notification, LOCKOUT_ATTEMPTS, Organization, DriverSponsorAssociation
 from extensions import bcrypt
 from datetime import datetime
 
@@ -74,9 +74,23 @@ def login():
 @driver_bp.route('/dashboard')
 @role_required(Role.DRIVER, Role.SPONSOR, allow_admin=True, redirect_to='auth.login')
 def dashboard():
-    settings = StoreSettings.query.first()
-    point_ratio = settings.point_ratio if settings else 10 # Default to 10 if not set
-    return render_template('driver/dashboard.html', user=current_user, point_ratio=point_ratio)
+    if current_user.USER_TYPE == Role.DRIVER:
+        # Fetch all associations for the current driver
+        associations = DriverSponsorAssociation.query.filter_by(driver_id=current_user.USER_CODE).all()
+        
+        # Calculate the total points from all associations
+        total_points = sum(assoc.points for assoc in associations)
+        
+        # We can pass the associations directly to the template
+        return render_template('driver/dashboard.html', user=current_user, associations=associations, total_points=total_points)
+
+    # Fallback for other user types (sponsors, admins)
+    sponsors = [] # Define sponsors as an empty list for non-drivers
+    if current_user.USER_TYPE == Role.SPONSOR:
+        # Your existing logic for sponsors can go here if needed
+        pass
+
+    return render_template('driver/dashboard.html', user=current_user, sponsors=sponsors)
 
 # Point History
 @driver_bp.route('/point_history')
@@ -109,10 +123,10 @@ def settings():
         current_user.wants_order_notifications = wants_orders
         current_user.wants_security_notifications = wants_security
         db.session.commit()
-        
+
         flash('Your settings have been updated!', 'success')
         return redirect(url_for('driver_bp.dashboard'))
-        
+
     return render_template('driver/settings.html')
 
 # Update Contact Information
@@ -120,7 +134,7 @@ def settings():
 @role_required(Role.DRIVER, Role.SPONSOR, allow_admin=True, redirect_to='auth.login')
 def update_contact():
     from extensions import db
-    
+
     driver = None
     if current_user.USER_TYPE == "driver":
         driver = Driver.query.get(current_user.USER_CODE)
@@ -134,22 +148,22 @@ def update_contact():
         if not email or '@' not in email:
             flash('Please enter a valid email address.', 'danger')
             return redirect(url_for('driver_bp.update_contact'))
-            
+
         # Check if email already exists for another user
         if User.query.filter(User.EMAIL == email, User.USER_CODE != current_user.USER_CODE).first():
             flash('Email already in use.', 'danger')
             return redirect(url_for('driver_bp.update_contact'))
-        
+
         # Basic phone validation (optional)
         if phone and (not phone.isdigit() or len(phone) < 10):
             flash('Please enter a valid phone number.', 'danger')
             return redirect(url_for('driver_bp.update_contact'))
-        
+
         # Check if phone already exists for another user
         if phone and User.query.filter(User.PHONE == phone, User.USER_CODE != current_user.USER_CODE).first():
             flash('Phone number already in use.', 'danger')
             return redirect(url_for('driver_bp.update_contact'))
-        
+
         try:
             current_user.EMAIL = email
             current_user.PHONE = phone
@@ -165,7 +179,7 @@ def update_contact():
             db.session.rollback()
             flash('An error occurred while updating your information', 'danger')
             return redirect(url_for('driver_bp.update_info'))
-        
+
     return render_template('driver/update_info.html', user=current_user, driver=driver)
 
 # Update Password
@@ -188,11 +202,11 @@ def change_password():
         if new_password != confirm_password:
             flash('New passwords do not match.', 'danger')
             return redirect(url_for('driver_bp.change_password'))
-        
+
         if len(new_password) < 8:
             flash('Password must be at least 8 characters long.', 'danger')
             return redirect(url_for('driver_bp.change_password'))
-        
+
         # Update password and email
         try:
             hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
@@ -204,7 +218,7 @@ def change_password():
             db.session.rollback()
             flash('An error occurred while updating your information', 'danger')
             return redirect(url_for('driver_bp.change_password'))
-        
+
     return render_template('driver/update_info.html', user=current_user)
 
 # Driver Application
@@ -217,6 +231,9 @@ def apply_driver():
     if request.method == "POST":
         org_id = request.form["org_id"]
         reason = request.form.get("reason", "")
+        
+        driver_profile = Driver.query.get(current_user.USER_CODE)
+        license_number = driver_profile.LICENSE_NUMBER if driver_profile else None
 
         existing = DriverApplication.query.filter_by(
             DRIVER_ID=current_user.USER_CODE,
@@ -236,6 +253,16 @@ def apply_driver():
             db.session.commit()
             flash("Application submitted successfully! Await sponsor review.", "success")
 
+        application = DriverApplication(
+            DRIVER_ID=current_user.USER_CODE,
+            SPONSOR_ID=sponsor_id,
+            REASON=reason,
+            STATUS="Pending",
+            LICENSE_NUMBER=license_number
+        )
+        db.session.add(application)
+        db.session.commit()
+        flash("Application submitted successfully! Await sponsor review.", "success")
         return redirect(url_for("driver_bp.dashboard"))
 
     return render_template("driver/driver_app.html", organizations=organizations)
@@ -299,3 +326,54 @@ def set_default_address(address_id):
     db.session.commit()
     flash('Default address has been updated!', 'success')
     return redirect(url_for('driver_bp.addresses'))
+
+
+@driver_bp.route('/truck_rewards_store/<int:sponsor_id>')
+@role_required(Role.DRIVER)
+def truck_rewards_store(sponsor_id):
+    association = DriverSponsorAssociation.query.filter_by(driver_id=current_user.USER_CODE, sponsor_id=sponsor_id).first()
+    if not association:
+        flash("You do not have access to this sponsor's store.", "danger")
+        return redirect(url_for('driver_bp.dashboard'))
+
+    # Proceed to show the store for the given sponsor
+    # You will need a template for this.
+    return render_template('driver/truck_rewards_store.html', sponsor_id=sponsor_id)
+
+@driver_bp.route('/redirect_to_store')
+@login_required
+@role_required(Role.DRIVER)
+def redirect_to_store():
+    """
+    Finds the first sponsor a driver is associated with and redirects to their store.
+    If no sponsors are found, redirects to the application page.
+    """
+    # Find the first association for the current driver.
+    association = DriverSponsorAssociation.query.filter_by(driver_id=current_user.USER_CODE).first()
+
+    if association:
+        # If a sponsor is found, redirect to their store.
+        return redirect(url_for('driver_bp.truck_rewards_store', sponsor_id=association.sponsor_id))
+    else:
+        # If no sponsors are found, send them to the application page with a helpful message.
+        flash("You are not yet a member of any sponsor organizations. Apply to one to get access to a store!", "info")
+        return redirect(url_for('driver_bp.apply_driver'))
+    
+@driver_bp.route('/redirect_to_cart')
+@login_required
+@role_required(Role.DRIVER)
+def redirect_to_cart():
+    """
+    Finds the first sponsor a driver is associated with and redirects to their cart.
+    If no sponsors are found, redirects to the application page.
+    """
+    # Find the first association for the current driver.
+    association = DriverSponsorAssociation.query.filter_by(driver_id=current_user.USER_CODE).first()
+
+    if association:
+        # If a sponsor is found, redirect to their cart page.
+        return redirect(url_for('rewards_bp.view_cart', sponsor_id=association.sponsor_id))
+    else:
+        # If no sponsors are found, send them to the application page with a helpful message.
+        flash("You must join a sponsor's organization to have a cart.", "info")
+        return redirect(url_for('driver_bp.apply_driver'))

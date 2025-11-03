@@ -3,12 +3,23 @@
         
         {# --- UNIVERSAL LINKS / NON-COLLAPSIBLE ITEMS --- #}
         
-        {# Example: Truck Rewards Store (If applicable to multiple roles) #}
-        <li>
-            <a href="{{ url_for('rewards_bp.store') }}" class="sidebar-link {{ 'active' if 'rewards_bp.store' in request.endpoint else '' }}">
-                Truck Rewards Store
-            </a>
-        </li>
+        {% if current_user.is_authenticated %}
+            {# For Sponsors: Link directly to their own store preview #}
+            {% if current_user.USER_TYPE == 'sponsor' %}
+                <li>
+                    <a href="{{ url_for('sponsor_bp.view_my_store') }}" class="sidebar-link {{ 'active' if 'view_my_store' in request.endpoint else '' }}">
+                        My Points Store
+                    </a>
+                </li>
+            {# For Drivers: Link to a new route that will automatically find a store #}
+            {% elif current_user.USER_TYPE == 'driver' %}
+                <li>
+                    <a href="{{ url_for('driver_bp.redirect_to_store') }}" class="sidebar-link">
+                        View Sponsor Stores
+                    </a>
+                </li>
+            {% endif %}
+        {% endif %}
 
         {# Example: About Page #}
         <li>
@@ -83,7 +94,7 @@
         {% if current_user.is_authenticated and current_user.USER_TYPE == 'sponsor' %}
             <li>
                 {% set sponsor_driver_endpoints = ['sponsor_bp.list__sponsor_users', 'sponsor_bp.add_user', 'sponsor_bp.create_user'] %}
-                <a href="{{ url_for('sponsor_bp.list_sponsor_users') }}" class="sidebar-link {{ 'active' if request.endpoint in sponsor_driver_endpoints else '' }}">
+                <a href="{{ url_for('sponsor_bp.driver_management') }}" class="sidebar-link {{ 'active' if request.endpoint in sponsor_driver_endpoints else '' }}">
                     Manage Drivers
                 </a>
             </li>

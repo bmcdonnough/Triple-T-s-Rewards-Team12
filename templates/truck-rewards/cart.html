@@ -27,7 +27,7 @@
               <p class="item-title"><strong>{{ item.title }}</strong></p>
               <p class="item-points">{{ item.points }} points × {{ item.quantity }}</p>
             </div>
-            <form method="POST" action="{{ url_for('rewards_bp.remove_from_cart', item_id=item.id) }}">
+            <form method="POST" action="{{ url_for('rewards_bp.remove_from_cart', item_id=item.id, sponsor_id=sponsor_id) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-outline">Remove</button>
             </form>
@@ -37,7 +37,7 @@
 
       <div class="cart-summary card">
         <h3>Total Points: <span class="summary-value">{{ total_points }}</span></h3>
-        <p>Your Balance: <strong>{{ current_user.POINTS }}</strong> points</p>
+        <p>Your Balance: <strong>{{ user_points }}</strong> points</p>
 
         {% if addresses %}
           <div class="form-group">
@@ -56,9 +56,10 @@
           </p>
         {% endif %}
 
-        {% if current_user.POINTS >= total_points and addresses %}
+        {% if user_points >= total_points and addresses %}
           <form method="POST" action="{{ url_for('rewards_bp.checkout') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="sponsor_id" value="{{ sponsor_id }}">
             <button type="submit" class="btn btn-primary">Checkout</button>
           </form>
         {% elif not addresses %}
@@ -68,7 +69,7 @@
         {% endif %}
       </div>
 
-      <form method="POST" action="{{ url_for('rewards_bp.clear_cart') }}" 
+      <form method="POST" action="{{ url_for('rewards_bp.clear_cart', sponsor_id=sponsor_id) }}" 
             onsubmit="return confirm('Are you sure you want to clear your entire cart?');" 
             class="clear-cart-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -80,7 +81,7 @@
     {% endif %}
 
     <div class="cart-footer">
-      <a href="{{ url_for('rewards_bp.store') }}" class="btn btn-dash">Back to Store</a>
+      <a href="{{ url_for('driver_bp.truck_rewards_store', sponsor_id=sponsor_id) }}" class="btn btn-dash">Back to Store</a>
     </div>
   </section>
 </body>

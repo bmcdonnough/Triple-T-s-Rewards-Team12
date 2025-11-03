@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Enable Email 2FA</h2>
+<p>We sent a 6-digit code to <b>{{ current_user.EMAIL }}</b>. Enter it below.</p>
+<form method="post" action="{{ url_for('auth.email_2fa_verify') }}">
+  {{ csrf_token() }}
+  <label>Code</label>
+  <input name="code" inputmode="numeric" pattern="\d{6}" maxlength="6" required>
+  <button class="btn" type="submit">Verify</button>
+</form>
+<p class="muted" style="margin-top:.5rem;">Didn’t get it? <a href="{{ url_for('auth.email_2fa_setup') }}">Resend</a></p>
+{% endblock %}

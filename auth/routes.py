@@ -7,10 +7,13 @@ from flask_login import login_user, logout_user, login_required, current_user
 import pyotp
 import qrcode
 import auth
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from common.second_factor import create_email_code, verify_email_code
 from models import User, Role  # Role has DRIVER, SPONSOR, ADMINISTRATOR
 from datetime import datetime, timedelta
 from extensions import db
 from sqlalchemy import or_
+from common.emailer import send_email
 from common.logging import log_audit_event, LOGIN_EVENT
 from . import auth_bp
 
@@ -44,7 +47,7 @@ def twofa_setup():
 
     return render_template("auth/setup_2fa.html", qr_data_url=qr_data_url, secret=current_user.TOTP_SECRET)
 
-
+@auth_bp.
 def dashboard_endpoint_redirect(user) -> str:
     mapping = {
         Role.ADMINISTRATOR: "administrator_bp.dashboard",
@@ -72,6 +75,43 @@ def twofa_verify():
     else:
         flash("Invalid code. Please try again.", "danger")
         return redirect(url_for("auth.twofa_setup"))
+
+@auth_bp.get("/2fa/email/setup")
+@login_required
+def email_2fa_setup():
+    if not current_user.EMAIL:
+        flash("Add an email to your profile before enabling Email 2FA.", "warning")
+        return redirect(url_for("auth.settings"))
+    # send code
+    code = create_email_code(current_user, "setup")
+    send_email(
+        current_user.EMAIL,
+        "Your Email 2FA verification code",
+        f"Your {current_user.USERNAME} 2FA setup code is: {code}\nThis code expires in 10 minutes."
+    )
+    flash("We sent a 6-digit code to your email. Enter it below to enable Email 2FA.", "info")
+    return render_template("auth/email_2fa_setup.html")
+
+@auth_bp.post("/2fa/email/verify")
+@login_required
+def email_2fa_verify():
+    code = (request.form.get("code") or "").strip()
+    if not code:
+        flash("Enter the 6-digit code.", "warning")
+        return redirect(url_for("auth.email_2fa_setup"))
+
+    ok = verify_email_code(current_user, "setup", code)
+    if not ok:
+        flash("Invalid or expired code.", "danger")
+        return redirect(url_for("auth.email_2fa_setup"))
+
+    current_user.EMAIL_VERIFIED = True
+    current_user.EMAIL_2FA_ENABLED = True
+    db.session.commit()
+    log_audit_event("EMAIL_2FA_ENABLED", f"user={current_user.USERNAME}")
+    flash("Email 2FA enabled!", "success")
+    return redirect(url_for("auth.settings"))
+
 
 def _is_safe_url(target: str) -> bool:
     ref = urlparse(request.host_url)

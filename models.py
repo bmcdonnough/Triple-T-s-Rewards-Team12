@@ -37,6 +37,17 @@ class AboutInfo(db.Model):
     product_name = db.Column(db.String(255))
     product_desc = db.Column(db.Text)
 
+class Email2FACode(db.Model):
+    __tablename__ = "EMAIL_2FA_CODE"
+    id          = db.Column(db.Integer, primary_key=True)
+    user_id     = db.Column(db.Integer, db.ForeignKey("USERS.USER_CODE"), index=True, nullable=False)
+    purpose     = db.Column(db.String(16), nullable=False)   # 'setup' | 'login' | 'reset'
+    code_hash   = db.Column(db.String(128), nullable=False)   # store hash, not raw code
+    sent_at     = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at  = db.Column(db.DateTime, nullable=False)
+    consumed_at = db.Column(db.DateTime)
+    attempts    = db.Column(db.Integer, default=0)
+
 class User(db.Model, UserMixin):
     __tablename__ = 'USERS'
     #User PI
@@ -59,6 +70,7 @@ class User(db.Model, UserMixin):
     # sponsor = db.relationship('Sponsor', backref='user', uselist=False, cascade="all, delete-orphan")
     driver_profile = db.relationship("Driver", back_populates="user_account", uselist=False)
     sponsor_profile = db.relationship("Sponsor", back_populates="user_account", uselist=False)
+    wants_security_notifications = db.Column(db.Boolean, default=True, nullable=False)
 
     #User account
     IS_ACTIVE = db.Column(db.Integer, nullable=False)
@@ -68,6 +80,8 @@ class User(db.Model, UserMixin):
     RESET_TOKEN_CREATED_AT = db.Column(db.DateTime, nullable=True)
     IS_LOCKED_OUT = db.Column(db.Integer, nullable=False)
     LOCKED_REASON = db.Column(db.String(255), nullable=True)
+    EMAIL_VERIFIED    = db.Column(db.Boolean, default=False)
+    EMAIL_2FA_ENABLED = db.Column(db.Boolean, default=False)
 
     def log_event(self, event_type: str, details: str = None):
         log_entry = AuditLog(EVENT_TYPE=event_type, DETAILS=details)

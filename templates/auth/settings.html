@@ -1,8 +1,42 @@
 {% extends "base.html" %}
 {% block content %}
-  <h2>Account Settings</h2>
+<section class="settings-section">
+  <h2>Two-Factor Authentication (2FA)</h2>
+  <p>You can secure your account with one or both of the following:</p>
 
-  <a href="{{ url_for('auth.twofa_setup') }}" class="btn btn-dash">Enable Two-Factor Authentication</a>
-    <!-- you can add more links like change password, notifications, etc. -->
-  </ul>
+  <div class="twofa-options">
+    <!-- 🔹 Authenticator App (TOTP) -->
+    <div class="twofa-option">
+      <h3>Authenticator App (TOTP)</h3>
+      {% if current_user.TOTP_SECRET %}
+        <p><strong>Status:</strong> Enabled ✅</p>
+        <form method="post" action="{{ url_for('auth.disable_totp') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-outline-danger" type="submit">Disable TOTP</button>
+        </form>
+      {% else %}
+        <p>Protect your account using an authenticator app like Google Authenticator or DUO.</p>
+        <a class="btn btn-primary" href="{{ url_for('auth.twofa_setup') }}">Set up Authenticator App</a>
+      {% endif %}
+    </div> <br>
+
+    <!-- 🔹 Email Verification -->
+    <div class="twofa-option">
+      <h3>Email Verification</h3>
+      {% if current_user.EMAIL_2FA_ENABLED %}
+        <p><strong>Status:</strong> Enabled ✅</p>
+        <form method="post" action="{{ url_for('auth.email_2fa_disable') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-outline-danger" type="submit">Disable Email 2FA</button>
+        </form>
+      {% else %}
+        <p>Enable email-based verification to receive login codes via your email.</p>
+        <form method="post" action="{{ url_for('auth.email_2fa_enable') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-primary" type="submit">Enable Email 2FA</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</section>
 {% endblock %}

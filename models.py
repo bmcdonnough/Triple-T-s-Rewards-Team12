@@ -274,12 +274,16 @@ class Notification(db.Model):
                     sender=("Triple T's Rewards (No Reply)", current_app.config.get("MAIL_USERNAME"))
                 )
 
+                sender_user = User.query.get(sender_code)
+                sender_name = f"{sender_user.FNAME} {sender_user.LNAME}" if sender_user else "Unknown Sender"
+                sender_username = sender_user.USERNAME if sender_user else "unknown"
+
                 msg.body = (
                     f"Hello {recipient.FNAME},\n\n"
-                    f"You have a new notification from Triple T's Rewards:\n\n"
+                    f"You have a new message from {sender_name} ({sender_username}) via Triple T's Rewards:\n\n"
                     f"{message}\n\n"
                     "----------------------------------------\n"
-                    "This is an automated message from Triple T's Rewards.\n"
+                    "This is an automated message from Triple T's Rewards (No Reply).\n"
                     "Please do not reply to this email.\n"
                     "For assistance, visit our support page or contact your sponsor.\n\n"
                     "© 2025 Triple T's Rewards, All rights reserved."

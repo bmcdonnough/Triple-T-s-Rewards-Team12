@@ -83,6 +83,18 @@ class User(db.Model, UserMixin):
     EMAIL_VERIFIED    = db.Column(db.Boolean, default=False)
     EMAIL_2FA_ENABLED = db.Column(db.Boolean, default=False)
 
+
+    def default_dashboard_endpoint(self) -> str:
+        r = getattr(self, "USER_TYPE", None)
+        if r in (Role.DRIVER, "driver"):
+            return "driver_bp.dashboard"
+        if r in (Role.SPONSOR, "sponsor"):
+            return "sponsor_bp.dashboard"
+        if r in (Role.ADMINISTRATOR, "admin", "administrator"):
+            return "administrator_bp.dashboard"
+        # sensible fallback
+        return "common_bp.index"
+    
     def log_event(self, event_type: str, details: str = None):
         log_entry = AuditLog(EVENT_TYPE=event_type, DETAILS=details)
         db.session.add(log_entry)

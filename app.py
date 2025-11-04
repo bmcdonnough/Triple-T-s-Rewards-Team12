@@ -9,7 +9,7 @@ from config import Config
 from models import User
 from flask_wtf.csrf import CSRFProtect
 from forms import AboutForm
-from extensions import bcrypt, migrate, login_manager, csrf, bcrypt, db
+from extensions import bcrypt, migrate, login_manager, csrf, bcrypt, db, mail
 from auth.routes import auth_bp
 
 # Initialize scheduler
@@ -77,6 +77,8 @@ def create_app():
         hours=24  # Check once per day
     )
 
+    mail.init_app(app)
+    
     return app
 
 @login_manager.user_loader

@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from extensions import db, login_manager
-from extensions import bcrypt
+from extensions import bcrypt, mail
+from flask_mail import Message
+import re
 import secrets
 from english_words import english_words_set
 import random
@@ -157,8 +159,8 @@ class Sponsor(db.Model):
     __tablename__ = "SPONSORS"
 
     # SPONSOR_ID now acts as both PK and FK → USERS.USER_CODE
-    SPONSOR_ID = db.Column(db.Integer, db.ForeignKey("USERS.USER_CODE"), primary_key=True)
-    ORG_NAME = db.Column(db.String(100))
+    USER_CODE = db.Column(db.Integer, db.ForeignKey("USERS.USER_CODE"), primary_key=True)
+    ORG_ID = db.Column(db.String(100))
     STATUS = db.Column(db.String(50))
 
     user_account = db.relationship("User", back_populates="sponsor_profile")
@@ -186,7 +188,7 @@ class DriverApplication(db.Model):
     __tablename__ = "DRIVER_APPLICATIONS"
     APPLICATION_ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
     DRIVER_ID = db.Column(db.Integer, db.ForeignKey("DRIVERS.DRIVER_ID", ondelete="CASCADE"))
-    SPONSOR_ID = db.Column(db.Integer, db.ForeignKey("SPONSORS.SPONSOR_ID", ondelete="CASCADE"))
+    ORG_ID = db.Column(db.Integer, db.ForeignKey("SPONSORS.ORG_ID", ondelete="CASCADE"))
     STATUS = db.Column(db.Enum("Pending", "Accepted", "Rejected", name="DRIVER_APPLICATION_STATUS"), default="Pending")
     REASON = db.Column(db.String(255))
     APPLIED_AT = db.Column(db.DateTime, server_default=db.func.now())
@@ -197,7 +199,7 @@ class DriverSponsorAssociation(db.Model):
     __tablename__ = "DRIVER_SPONSOR_ASSOCIATION"
 
     driver_id = db.Column(db.Integer, db.ForeignKey("DRIVERS.DRIVER_ID"), primary_key=True)
-    sponsor_id = db.Column(db.Integer, db.ForeignKey("SPONSORS.SPONSOR_ID"), primary_key=True)
+    sponsor_id = db.Column(db.Integer, db.ForeignKey("SPONSORS.USER_CODE"), primary_key=True)
     points = db.Column(db.Integer, default=0)
 
     driver = db.relationship("Driver", back_populates="sponsor_associations")
@@ -236,6 +238,9 @@ class Notification(db.Model):
 
     @staticmethod
     def create_notification(recipient_code, sender_code, message):
+        from flask import current_app
+        import threading
+
         notification = Notification(
             RECIPIENT_CODE=recipient_code,
             SENDER_CODE=sender_code,
@@ -249,7 +254,50 @@ class Notification(db.Model):
         except Exception as e:
             db.session.rollback()
             raise e
+
+        recipient = User.query.get(recipient_code)
+        if recipient and recipient.EMAIL and Notification.real_email(recipient.EMAIL):
+            print(f"Preparing to send notification email to {recipient.EMAIL}")
+
+            def send_async_email(app, msg):
+                with app.app_context():
+                    try:
+                        mail.send(msg)
+                    except Exception as e:
+                        print(f"⚠️ Error sending email to {recipient.EMAIL}: {e}")
+
+            try:
+                msg = Message(
+                    subject="Triple T's Rewards Notification",
+                    recipients=[recipient.EMAIL],
+                    body=message,
+                    sender=("Triple T's Rewards (No Reply)", current_app.config.get("MAIL_USERNAME"))
+                )
+
+                msg.body = (
+                    f"Hello {recipient.FNAME},\n\n"
+                    f"You have a new notification from Triple T's Rewards:\n\n"
+                    f"{message}\n\n"
+                    "----------------------------------------\n"
+                    "This is an automated message from Triple T's Rewards.\n"
+                    "Please do not reply to this email.\n"
+                    "For assistance, visit our support page or contact your sponsor.\n\n"
+                    "© 2025 Triple T's Rewards, All rights reserved."
+                )
+
+                app = current_app._get_current_object()
+                threading.Thread(target=send_async_email, args=(app, msg)).start()
+            except Exception as e:
+                print(f"Error preparing async email thread: {e}")
+
         return notification
+
+    @staticmethod
+    def real_email(email):
+        pattern = r"^[^@]+@[^@]+\.[^@]+$"
+        blacklist = ["example.com", "fake.com", "test.com", "tempmail.com"]
+        return bool(re.match(pattern, email)) and not any(bad in email for bad in blacklist)
+    
     
 class Address(db.Model):
     __tablename__ = 'ADDRESSES'

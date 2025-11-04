@@ -8,7 +8,7 @@ import qrcode
 import auth
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from common.second_factor import create_email_code, verify_email_code, send_email
-from models import User, Role  # Role has DRIVER, SPONSOR, ADMINISTRATOR
+from models import User, Role, Notification  # Role has DRIVER, SPONSOR, ADMINISTRATOR
 from datetime import datetime, timedelta
 from extensions import db
 from sqlalchemy import or_
@@ -204,6 +204,21 @@ def login():
             remaining = max(0, LOCKOUT_ATTEMPTS - user.FAILED_ATTEMPTS)
             flash(f"Invalid username or password. {remaining} attempts remaining.", "danger")
             log_audit_event(LOGIN_EVENT, f"user={user.USERNAME} ip={ip} attempts={user.FAILED_ATTEMPTS}")
+            
+            # Send security notification for failed login attempts
+            if user.wants_security_notifications:
+                attempt_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+                message = f"Suspicious login activity detected on your account at {attempt_time}. Failed login attempt from IP: {ip}. If this wasn't you, please contact support immediately."
+                try:
+                    Notification.create_notification(
+                        recipient_code=user.USER_CODE,
+                        sender_code=user.USER_CODE,  # System notification from user to self
+                        message=message
+                    )
+                except Exception as e:
+                    # Log the error but don't fail the login process
+                    log_audit_event("SECURITY_NOTIFICATION_FAILED", f"Failed to send security notification to user {user.USERNAME}: {str(e)}")
+            
             return render_template("common/login.html")
         
         needs_totp = bool(user.TOTP_SECRET)

@@ -1,8 +1,6 @@
-# jchampion136/triple-t-s-rewards-team12/Triple-T-s-Rewards-Team12-51de9b373ff72c36ad6ce76b39ff03679a536ebc/truck_rewards/routes.py
-
 from flask import Blueprint, render_template, jsonify, request, flash, redirect, url_for
 from flask_login import login_required, current_user
-from models import StoreSettings, CartItem, User, Notification, Address, WishlistItem
+from models import StoreSettings, CartItem, User, Notification, Address, WishlistItem, DriverSponsorAssociation
 from extensions import db
 import requests
 import os
@@ -16,6 +14,7 @@ rewards_bp = Blueprint('rewards_bp', __name__, template_folder="../templates")
 
 # --- Helper function to get eBay Access Token ---
 def get_ebay_access_token():
+    # (No changes needed in this function)
     if USE_SANDBOX:
         app_id = os.getenv('EBAY_APP_ID')
         cert_id = os.getenv('EBAY_CERT_ID')
@@ -47,25 +46,27 @@ def get_ebay_access_token():
         print(f"Error getting eBay access token: {e}")
         return None
 
-# --- Main Store Route ---
+# --- Main Store Route (No longer needed, but can be kept or removed) ---
 @rewards_bp.route('/')
 def store():
     return render_template('truck-rewards/index.html')
 
 # --- Products API Endpoint ---
-@rewards_bp.route("/products")
-def products():
-    settings = StoreSettings.query.first()
+@rewards_bp.route("/products/<int:sponsor_id>")
+@login_required
+def products(sponsor_id):
+    settings = StoreSettings.query.filter_by(sponsor_id=sponsor_id).first()
     if not settings:
-        category_id = "2984"
-        point_ratio = 10
-    else:
-        category_id = settings.ebay_category_id
-        point_ratio = settings.point_ratio
+        return jsonify({"error": "Store settings not found for this sponsor."}), 404
+        
+    category_id = settings.ebay_category_id
+    point_ratio = settings.point_ratio
+    
     search_query = request.args.get('q')
     min_price = request.args.get('min_price')
     max_price = request.args.get('max_price')
     access_token = get_ebay_access_token()
+
     if not access_token:
         return jsonify({"error": "Could not authenticate with eBay API"}), 500
     if USE_SANDBOX:
@@ -114,19 +115,28 @@ def products():
 @login_required
 def add_to_cart():
     """Adds an item to the current user's cart."""
+    sponsor_id = request.form.get('sponsor_id', type=int)
     item_id = request.form.get('id')
     title = request.form.get('title')
     price = request.form.get('price', type=float)
     points = request.form.get('pointsEquivalent', type=int)
     image_url = request.form.get('image')
 
-    existing_item = CartItem.query.filter_by(user_id=current_user.USER_CODE, item_id=item_id).first()
+    if not sponsor_id:
+        return jsonify({"status": "error", "message": "Sponsor ID is missing."}), 400
+    
+    existing_item = CartItem.query.filter_by(
+        user_id=current_user.USER_CODE, 
+        sponsor_id=sponsor_id, 
+        item_id=item_id
+    ).first()
 
     if existing_item:
         existing_item.quantity += 1
     else:
         new_item = CartItem(
             user_id=current_user.USER_CODE,
+            sponsor_id=sponsor_id,
             item_id=item_id,
             title=title,
             price=price,
@@ -138,37 +148,56 @@ def add_to_cart():
     db.session.commit()
     return jsonify({"status": "success", "message": f"'{title}' has been added to your cart."})
 
-@rewards_bp.route("/cart")
+@rewards_bp.route("/cart/<int:sponsor_id>")
 @login_required
-def view_cart():
+def view_cart(sponsor_id):
     """Displays the user's shopping cart."""
-    cart_items = CartItem.query.filter_by(user_id=current_user.USER_CODE).all()
+    cart_items = CartItem.query.filter_by(
+        user_id=current_user.USER_CODE,
+        sponsor_id=sponsor_id
+    ).all()
+
     total_points = sum(item.points * item.quantity for item in cart_items)
     addresses = Address.query.filter_by(user_id=current_user.USER_CODE).all()
-    return render_template('truck-rewards/cart.html', cart_items=cart_items, total_points=total_points, addresses=addresses)
 
-@rewards_bp.route("/remove_from_cart/<int:item_id>", methods=['POST'])
+    association = DriverSponsorAssociation.query.filter_by(
+        driver_id=current_user.USER_CODE,
+        sponsor_id=sponsor_id
+    ).first()
+
+    user_points = association.points if association else 0
+
+    return render_template(
+        'truck-rewards/cart.html',
+        cart_items=cart_items,
+        total_points=total_points,
+        addresses=addresses,
+        user_points=user_points, 
+        sponsor_id=sponsor_id     
+    )
+
+@rewards_bp.route("/remove_from_cart/<int:item_id>/<int:sponsor_id>", methods=['POST'])
 @login_required
-def remove_from_cart(item_id):
+def remove_from_cart(item_id, sponsor_id):
     """Removes an item from the cart."""
     item_to_remove = CartItem.query.get_or_404(item_id)
     if item_to_remove.user_id != current_user.USER_CODE:
         flash("You can only remove your own items.", "danger")
-        return redirect(url_for('rewards_bp.view_cart'))
+        return redirect(url_for('rewards_bp.view_cart', sponsor_id=sponsor_id))
 
     db.session.delete(item_to_remove)
     db.session.commit()
     flash("Item removed from your cart.", "info")
-    return redirect(url_for('rewards_bp.view_cart'))
+    return redirect(url_for('rewards_bp.view_cart', sponsor_id=sponsor_id))
 
-@rewards_bp.route("/cart/clear", methods=['POST'])
+@rewards_bp.route("/cart/clear/<int:sponsor_id>", methods=['POST'])
 @login_required
-def clear_cart():
+def clear_cart(sponsor_id):
     """Clears all items from the user's cart."""
-    CartItem.query.filter_by(user_id=current_user.USER_CODE).delete()
+    CartItem.query.filter_by(user_id=current_user.USER_CODE, sponsor_id=sponsor_id).delete()
     db.session.commit()
     flash("Your cart has been cleared.", "info")
-    return redirect(url_for('rewards_bp.view_cart'))
+    return redirect(url_for('rewards_bp.view_cart', sponsor_id=sponsor_id))
 
 @rewards_bp.route("/cart/count")
 @login_required
@@ -220,24 +249,35 @@ def remove_from_wishlist(item_id):
     flash("Item removed from your wishlist.", "info")
     return redirect(url_for('rewards_bp.view_wishlist'))
 
+# --- CHECKOUT FUNCTION ---
 @rewards_bp.route("/checkout", methods=['POST'])
 @login_required
 def checkout():
-    """Processes the cart purchase."""
+    # This now requires a sponsor_id from the form to know which point balance to use
+    sponsor_id = request.form.get('sponsor_id', type=int)
+    if not sponsor_id:
+        flash("Sponsor ID is missing. Cannot complete purchase.", "danger")
+        return redirect(url_for('driver_bp.dashboard'))
+
     cart_items = CartItem.query.filter_by(user_id=current_user.USER_CODE).all()
     total_points = sum(item.points * item.quantity for item in cart_items)
 
-    if current_user.POINTS < total_points:
-        flash("You do not have enough points to complete this purchase.", "danger")
-        return redirect(url_for('rewards_bp.view_cart'))
+    association = DriverSponsorAssociation.query.filter_by(
+        driver_id=current_user.USER_CODE,
+        sponsor_id=sponsor_id
+    ).first()
 
-    current_user.POINTS -= total_points
+    if not association or association.points < total_points:
+        flash("You do not have enough points with this sponsor to complete this purchase.", "danger")
+        return redirect(url_for('rewards_bp.view_cart', sponsor_id=sponsor_id))
+
+    association.points -= total_points
     
     # Send notification if enabled
     if current_user.wants_order_notifications:
         Notification.create_notification(
             recipient_code=current_user.USER_CODE,
-            sender_code=current_user.USER_CODE, # Or a system user ID if you create one
+            sender_code=current_user.USER_CODE,
             message=f"Your order for {total_points} points has been placed successfully!"
         )
 
@@ -246,5 +286,5 @@ def checkout():
     
     db.session.commit()
 
-    flash(f"Purchase successful! {total_points} points have been deducted.", "success")
-    return redirect(url_for('rewards_bp.store'))
+    flash(f"Purchase successful! {total_points} points have been deducted from your balance with this sponsor.", "success")
+    return redirect(url_for('driver_bp.dashboard')) # Redirect to driver dashboard

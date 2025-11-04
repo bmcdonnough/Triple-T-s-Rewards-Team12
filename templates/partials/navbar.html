@@ -25,16 +25,20 @@
         <span id="notification-count"></span>
         <span class="visually-hidden">Messages and Notifications</span>
       </a>
-      <a href="{{ url_for('rewards_bp.view_cart') }}" class="nav-link" aria-label="View Cart">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icon-tabler-shopping-cart">
-          <circle cx="9" cy="19" r="1" />
-          <circle cx="17" cy="19" r="1" />
-          <path d="M5 6h16l-1.5 9h-13z" />
-          <path d="M5 6l-1 -3" />
-        </svg>
-        <span id="cart-item-count"></span>
-        <span class="visually-hidden">Cart</span>
-      </a>
+
+      {% if current_user.USER_TYPE == 'driver' %}
+        <a href="{% if sponsor_id is defined %}{{ url_for('rewards_bp.view_cart', sponsor_id=sponsor_id) }}{% else %}{{ url_for('driver_bp.redirect_to_cart') }}{% endif %}" class="nav-link" aria-label="View Cart">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icon-tabler-shopping-cart">
+            <circle cx="9" cy="19" r="1" />
+            <circle cx="17" cy="19" r="1" />
+            <path d="M5 6h16l-1.5 9h-13z" />
+            <path d="M5 6l-1 -3" />
+          </svg>
+          <span id="cart-item-count"></span>
+          <span class="visually-hidden">Cart</span>
+        </a>
+      {% endif %}
+      
       <a href="{{ url_for('rewards_bp.view_wishlist') }}" class="nav-link">
         Wishlist
       </a>

@@ -1,0 +1,12 @@
+<!-- templates/auth/totp_challenge.html -->
+{% extends "base.html" %}
+{% block content %}
+  <h2>Two-Factor Authentication</h2>
+  <p>Enter the 6-digit code from your authenticator app.</p>
+
+  <form method="post" action="{{ url_for('auth.twofa_verify_login') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input id="token" name="token" inputmode="numeric" pattern="\d{6}" maxlength="6" required> <br><br>
+    <button class="btn" type="submit">Verify</button>
+  </form>
+{% endblock %}

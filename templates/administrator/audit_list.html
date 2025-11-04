@@ -4,15 +4,14 @@
   <div style="display:flex; align-items:center; justify-content:space-between;">
     <h1>{{ title }}</h1>
     <a class="btn"
-       href="{{ url_for('administrator_bp.export_audit_csv', event_type=event_type) }}">
+       href="{{ url_for('administrator_bp.export_audit_csv', event_type=event_type, start=start, end=end) }}">
       ⬇︎ Download CSV
     </a>
   </div>
 
   {% include "partials/filter.html" with context %}
-  {# ... your table follows ... #}
 
-  {% if events|length == 0 %}
+  {% if logs|length == 0 %}
     <p class="muted">No events yet.</p>
   {% else %}
     <table>
@@ -24,11 +23,10 @@
         </tr>
       </thead>
       <tbody>
-        {% for e in events %}
+        {% for e in logs %}
           <tr>
             <td>{{ e.CREATED_AT.strftime('%Y-%m-%d %H:%M:%S') if e.CREATED_AT else '' }}</td>
 
-            {# For Login Activity, show SUCCESS / FAIL / LOGOUT badge based on DETAILS #}
             {% if title == "Login Activity" %}
               {% set status = (e.DETAILS or "").split(" ", 1)[0] %}
               {% set cls = status.lower() %}
@@ -37,7 +35,7 @@
               <td>{{ e.EVENT_TYPE }}</td>
             {% endif %}
 
-            <td><code padding:.1rem .3rem; border-radius:.25rem">{{ e.DETAILS or "" }}</code></td>
+            <td><code>{{ e.DETAILS or "" }}</code></td>
           </tr>
         {% endfor %}
       </tbody>

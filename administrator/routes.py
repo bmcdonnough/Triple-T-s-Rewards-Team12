@@ -1,17 +1,20 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response
 from flask_login import login_user, logout_user, login_required, current_user
 from common.decorators import role_required
-from models import User, Role, AuditLog, Driver, Sponsor, Admin
+from models import User, Role, AuditLog, Notification, LOCKOUT_ATTEMPTS
 from extensions import db
 from sqlalchemy import or_
 from common.logging import (LOGIN_EVENT,
     SALES_BY_SPONSOR, SALES_BY_DRIVER, INVOICE_EVENT,
     DRIVER_POINTS)
 from common.logging import (LOGIN_EVENT, SALES_BY_SPONSOR, SALES_BY_DRIVER, INVOICE_EVENT, DRIVER_POINTS, log_audit_event)
+from datetime import datetime
 from datetime import datetime, timedelta
-from models import db, Sponsor
+from models import db, Sponsor, Driver, Admin,  User, Role, AuditLog
 import csv
 from io import StringIO
+from audit_types import AUDIT_CATEGORIES
+from common.logging import log_audit_event
 
 # Blueprint for administrator-related routes
 administrator_bp = Blueprint('administrator_bp', __name__, template_folder="../templates")
@@ -19,106 +22,113 @@ administrator_bp = Blueprint('administrator_bp', __name__, template_folder="../t
 @administrator_bp.get("/audit_logs/export")
 @role_required(Role.ADMINISTRATOR, allow_admin=False)
 def export_audit_csv():
-    selected_type = request.args.get("type") or request.args.get("event_type")
+    category_key = request.args.get("event_type") or request.args.get("type", "")
     start_str = request.args.get("start")
     end_str = request.args.get("end")
-    
-    def parse_date(date_str):
-        try:
-            return datetime.strptime(date_str, "%Y-%m-%d")
-        except (ValueError, TypeError):
-            return None
+
+    def parse_date(s):
+        for fmt in ("%m/%d/%Y", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(s, fmt)
+            except (ValueError, TypeError):
+                pass
+        return None
 
     start_dt = parse_date(start_str)
     end_dt = parse_date(end_str)
 
-    event_type = request.args.get("event_type")
+    if category_key and category_key in AUDIT_CATEGORIES:
+        event_types = list(AUDIT_CATEGORIES[category_key])
+    else:
+        event_types = None  # export all
+
     q = AuditLog.query.order_by(AuditLog.CREATED_AT.desc())
-    if event_type:
-        q = q.filter(AuditLog.EVENT_TYPE == event_type)
+    if event_types:
+        q = q.filter(AuditLog.EVENT_TYPE.in_(event_types))
     if start_dt:
         q = q.filter(AuditLog.CREATED_AT >= start_dt)
     if end_dt:
         q = q.filter(AuditLog.CREATED_AT < end_dt + timedelta(days=1))
-    rows = q.order_by(AuditLog.CREATED_AT.desc()).all()
-    
+
+    rows = q.all()
+
     si = StringIO()
     cw = csv.writer(si)
-    cw.writerow(["created_at", "event_type", "username", "id"])
+    cw.writerow(["created_at", "event_type", "details", "id"])
     for row in rows:
-        cw.writerow([row.CREATED_AT.strftime("%Y-%m-%d %H:%M:%S") if row.CREATED_AT else "",
-                     row.EVENT_TYPE or "",
-                     row.DETAILS or "",
-                     row.EVENT_ID or ""])
-    csv_bytes = si.getvalue().encode('utf-8')
-    filename = f"audit_logs_{event_type or 'all'}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    return Response(
-        csv_bytes,
-        mimetype="text/csv",
-        headers={"Content-Disposition": f"attachment;filename={filename}"}
-    )
+        cw.writerow([
+            row.CREATED_AT.strftime("%Y-%m-%d %H:%M:%S") if row.CREATED_AT else "",
+            row.EVENT_TYPE or "",
+            row.DETAILS or "",
+            row.EVENT_ID or "",
+        ])
+
+    filename = f"audit_logs_{category_key or 'all'}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return Response(si.getvalue().encode("utf-8"),
+                    mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename={filename}"})
+
 @administrator_bp.route("/audit_logs")
 @role_required(Role.ADMINISTRATOR, allow_admin=False)
 def audit_menu():
     return render_template("administrator/audit_menu.html")
-@administrator_bp.route("/audit_logs/sales/sponsor")
-@role_required(Role.ADMINISTRATOR, allow_admin=False)
-def audit_sales_by_sponsor():
-    events = AuditLog.query.filter(
-        AuditLog.EVENT_TYPE == SALES_BY_SPONSOR
-    ).order_by(AuditLog.CREATED_AT.desc()).all()
-    return render_template("administrator/audit_list.html",
-                           title="Sales by Sponsor",
-                           events=events)
-
-@administrator_bp.route("/audit_logs/sales/driver")
-@role_required(Role.ADMINISTRATOR, allow_admin=False)
-def audit_sales_by_driver():
-    events = AuditLog.query.filter(
-        AuditLog.EVENT_TYPE == SALES_BY_DRIVER
-    ).order_by(AuditLog.CREATED_AT.desc()).all()
-    return render_template("administrator/audit_list.html",
-                           title="Sales by Driver",
-                           events=events)
-
-@administrator_bp.route("/audit_logs/invoices")
-@role_required(Role.ADMINISTRATOR, allow_admin=False)
-def audit_invoices():
-    events = AuditLog.query.filter(
-        AuditLog.EVENT_TYPE == INVOICE_EVENT
-    ).order_by(AuditLog.CREATED_AT.desc()).all()
-    return render_template("administrator/audit_list.html",
-                           title="Invoices",
-                           events=events)
-
-@administrator_bp.route("/audit_logs/driver-points")
-@role_required(Role.ADMINISTRATOR, allow_admin=False)
-def audit_driver_points():
-    events = AuditLog.query.filter(
-        AuditLog.EVENT_TYPE == DRIVER_POINTS
-    ).order_by(AuditLog.CREATED_AT.desc()).all()
-    return render_template("administrator/audit_list.html",
-                           title="Driver Point Tracking",
-                           events=events)
-
 
 # Login
 @administrator_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
 
-        # Look up user by USERNAME
         user = User.query.filter_by(USERNAME=username).first()
-
-        # Check password with bcrypt
-        if user and user.check_password(password):
-            login_user(user)
-            flash("Login successful!", "success")
-            return redirect(url_for('administrator_bp.dashboard'))
-        else:
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+        
+        if not user:
             flash("Invalid username or password", "danger")
+            log_audit_event(LOGIN_EVENT, f"FAIL user={username} ip={ip}")
+            return render_template('administrator/login.html')
+        
+        if user.is_account_locked():
+            if user.LOCKED_REASON == "admin":
+                until = user.LOCKOUT_TIME.strftime("%Y-%m-%d %H:%M:%S") if user.LOCKOUT_TIME else "later"
+                flash(f"Your account has been locked by an administrator until {until}.", "danger")
+                log_audit_event(LOGIN_EVENT, f"user={user.USERNAME} ip={ip} reason=locked")
+                return render_template('administrator/login.html')
+            else:
+                flash("Account locked. Please Contact your Administrator.", "danger")
+                log_audit_event(LOGIN_EVENT, f"user={user.USERNAME} ip={ip} reason=locked")
+                return render_template('administrator/login.html')
+        
+        if not user.check_password(password):
+            user.register_failed_attempt()
+            db.session.commit()
+            remaining = max(0, LOCKOUT_ATTEMPTS - user.FAILED_ATTEMPTS)
+            flash(f"Invalid username or password. {remaining} attempts remaining.", "danger")
+            log_audit_event(LOGIN_EVENT, f"user={user.USERNAME} ip={ip} attempts={user.FAILED_ATTEMPTS}")
+            
+            # Send security notification for failed login attempts
+            if user.wants_security_notifications:
+                attempt_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+                message = f"Suspicious login activity detected on your account at {attempt_time}. Failed login attempt from IP: {ip}. If this wasn't you, please contact support immediately."
+                try:
+                    Notification.create_notification(
+                        recipient_code=user.USER_CODE,
+                        sender_code=user.USER_CODE,  # System notification from user to self
+                        message=message
+                    )
+                except Exception as e:
+                    # Log the error but don't fail the login process
+                    log_audit_event("SECURITY_NOTIFICATION_FAILED", f"Failed to send security notification to user {user.USERNAME}: {str(e)}")
+            
+            return render_template('administrator/login.html')
+        
+        # On successful login
+        user.clear_failed_attempts()
+        db.session.commit()
+        login_user(user)
+        flash("Login successful!", "success")
+        log_audit_event(LOGIN_EVENT, f"user={user.USERNAME} role={user.USER_TYPE} ip={ip}")
+        return redirect(url_for('administrator_bp.dashboard'))
 
     # Looks inside templates/administrator/login.html
     return render_template('administrator/login.html')
@@ -133,69 +143,65 @@ def dashboard():
 @administrator_bp.get('/audit_logs/view')
 @role_required(Role.ADMINISTRATOR, allow_admin=False)
 def view_audit_logs():
-    select_type = request.args.get("type")
-    start_str = request.args.get("start")
-    end_str = request.args.get("end")
-    
-    event_type = request.args.get("event_type")
+    category_key = (request.args.get("event_type") or "").strip()
 
-    allowed = {LOGIN_EVENT, SALES_BY_SPONSOR, SALES_BY_DRIVER, INVOICE_EVENT, DRIVER_POINTS}
-    if select_type and select_type not in allowed:
+    if category_key not in AUDIT_CATEGORIES:
         flash("Unknown audit log type.", "warning")
-        select_type = None
+        return redirect(url_for("administrator_bp.audit_menu"))
 
-    q = AuditLog.query
-    if select_type:
-        q = q.filter(AuditLog.EVENT_TYPE == select_type)
-        
-    events = q.limit(500).all()
-    
+    start_str = request.args.get("start")
+    end_str   = request.args.get("end")
+
     def parse_date(s):
         if not s:
             return None
-        try:
-            return datetime.strptime(s, "%Y-%m-%d")
-        except ValueError:
-            return None
-    
+        for fmt in ("%m/%d/%Y", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(s, fmt)
+            except ValueError:
+                pass
+        return None
+
     start_dt = parse_date(start_str)
-    end_dt = parse_date(end_str)
+    end_dt   = parse_date(end_str)
+
+    # Base query by category
+    if category_key == "bulk_load":
+        # Capture all known variants + any future "*bulk_load*"
+        q = AuditLog.query.filter(
+            or_(
+                AuditLog.EVENT_TYPE.in_(list(AUDIT_CATEGORIES["bulk_load"])),
+                AuditLog.EVENT_TYPE.ilike("bulk_load%"),
+                AuditLog.EVENT_TYPE.ilike("%_bulk_load%"),
+            )
+        )
+    else:
+        q = AuditLog.query.filter(AuditLog.EVENT_TYPE.in_(list(AUDIT_CATEGORIES[category_key])))
 
     if start_dt:
         q = q.filter(AuditLog.CREATED_AT >= start_dt)
     if end_dt:
         q = q.filter(AuditLog.CREATED_AT < end_dt + timedelta(days=1))
 
-    events = q.order_by(AuditLog.CREATED_AT.desc()).limit(500).all()
+    logs = q.order_by(AuditLog.CREATED_AT.desc()).limit(500).all()
 
-    logs = (AuditLog.query
-            .filter(AuditLog.EVENT_TYPE == select_type)
-            .order_by(AuditLog.CREATED_AT.desc())
-            .limit(200)
-            .all())
-
-    # Nice page title
     titles = {
-        LOGIN_EVENT: "Login Activity",
-        SALES_BY_SPONSOR: "Sales by Sponsor",
-        SALES_BY_DRIVER: "Sales by Driver",
-        INVOICE_EVENT: "Invoices",
-        DRIVER_POINTS: "Driver Point Tracking",
+        "login": "Login Activity",
+        "driver_points": "Driver Point Tracking",
+        "sales_by_sponsor": "Sales by Sponsor",
+        "sales_by_driver": "Sales by Driver",
+        "invoices": "Invoices",
+        "bulk_load": "Bulk Loading",
     }
 
-    title = titles.get(select_type, "Audit Logs")
-    
     return render_template(
         "administrator/audit_list.html",
-        logs = logs,
+        logs=logs,                       # <— make sure your template iterates 'logs'
+        title=titles.get(category_key, "Audit Logs"),
+        event_type=category_key,
         start=start_str,
         end=end_str,
-        select_type=select_type,
-        title=titles.get(event_type, "Audit Logs"),
-        events=events,
-        event_type=event_type
     )
-
 # Logout
 @administrator_bp.route('/logout')
 @login_required
@@ -243,7 +249,10 @@ def add_user():
             EMAIL=email,
             IS_LOCKED_OUT=0,
             CREATED_AT=datetime.now(),
-            IS_ACTIVE=1
+            IS_ACTIVE=1,
+            wants_point_notifications=True,
+            wants_order_notifications=True,
+            wants_security_notifications=True
         )
         new_pass = new_user.admin_set_new_pass()
 
@@ -454,18 +463,30 @@ def reset_user_password(user_id):
 
 @administrator_bp.route("/sponsors")
 @login_required
+@role_required(Role.ADMINISTRATOR)
 def review_sponsors():
     sponsors = Sponsor.query.filter_by(STATUS="Pending").all()
-    return render_template("review_sponsors.html", sponsors=sponsors)
+    return render_template("administrator/review_sponsor.html", sponsors=sponsors)
 
 @administrator_bp.route("/sponsors/<int:sponsor_id>/<decision>")
 @login_required
+@role_required(Role.ADMINISTRATOR)
 def sponsor_decision(sponsor_id, decision):
     sponsor = Sponsor.query.get_or_404(sponsor_id)
-    sponsor.STATUS = "Approved" if decision == "approve" else "Rejected"
+    if decision == "approve":
+        sponsor.STATUS = "Approved"
+        # Removed: if sponsor_user: sponsor_user.IS_ACTIVE = 1 
+        flash(f"Sponsor '{sponsor.ORG_NAME}' approved!", "success") 
+    elif decision == "reject":
+        sponsor.STATUS = "Rejected"
+        # Removed: if sponsor_user: sponsor_user.IS_ACTIVE = 0
+        flash(f"Sponsor '{sponsor.ORG_NAME}' rejected.", "warning") 
+    else:
+        flash("Invalid decision.", "danger")
+        return redirect(url_for("administrator_bp.review_sponsors"))
+
     db.session.commit()
-    flash(f"Sponsor {decision}d!", "info")
-    return redirect(url_for("adminstrator_bp.review_sponsors"))
+    return redirect(url_for("administrator_bp.review_sponsors"))
 
 @administrator_bp.get("/timeouts")
 @role_required(Role.ADMINISTRATOR)

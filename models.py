@@ -25,7 +25,7 @@ class Role:
     DRIVER = 'driver'
     SPONSOR = 'sponsor'
     ADMINISTRATOR = 'administrator'
-    
+
     @staticmethod
     def choices():
         return [Role.DRIVER, Role.SPONSOR, Role.ADMINISTRATOR]
@@ -38,22 +38,34 @@ class AboutInfo(db.Model):
     release_date = db.Column(db.DateTime, default=datetime)
     product_name = db.Column(db.String(255))
     product_desc = db.Column(db.Text)
-    
+
+class Email2FACode(db.Model):
+    __tablename__ = "EMAIL_2FA_CODE"
+    id          = db.Column(db.Integer, primary_key=True)
+    user_id     = db.Column(db.Integer, db.ForeignKey("USERS.USER_CODE"), index=True, nullable=False)
+    purpose     = db.Column(db.String(16), nullable=False)   # 'setup' | 'login' | 'reset'
+    code_hash   = db.Column(db.String(128), nullable=False)   # store hash, not raw code
+    sent_at     = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at  = db.Column(db.DateTime, nullable=False)
+    consumed_at = db.Column(db.DateTime)
+    attempts    = db.Column(db.Integer, default=0)
+
 class User(db.Model, UserMixin):
     __tablename__ = 'USERS'
     #User PI
     USER_CODE = db.Column(db.Integer, primary_key=True, autoincrement=True)
     USERNAME = db.Column(db.String(50), unique=True, nullable=False)
-    PASS = db.Column(db.String(255), nullable=True)  
+    PASS = db.Column(db.String(255), nullable=True)
     USER_TYPE = db.Column(db.String(20), nullable=False)
     FNAME = db.Column(db.String(50), nullable=False)
     LNAME = db.Column(db.String(50), nullable=False)
     EMAIL = db.Column(db.String(100), nullable=False)
-    CREATED_AT = db.Column(db.DateTime, nullable=False)
+    CREATED_AT = db.Column(db.DateTime, nullable=False)    
     PHONE = db.Column(db.String(15), nullable=True)
     LOCKED_REASON = db.Column(db.String(100), nullable=True)
     wants_point_notifications = db.Column(db.Boolean, default=True, nullable=False)
     wants_order_notifications = db.Column(db.Boolean, default=True, nullable=False)
+    wants_security_notifications = db.Column(db.Boolean, default=True, nullable=False)
     TOTP_SECRET = db.Column(db.String(16), nullable=True)
     TOTP_ENABLED = db.Column(db.Boolean, default=False, nullable=False)
     addresses = db.relationship('Address', backref='user', lazy=True, cascade="all, delete-orphan")
@@ -61,6 +73,7 @@ class User(db.Model, UserMixin):
     # sponsor = db.relationship('Sponsor', backref='user', uselist=False, cascade="all, delete-orphan")
     driver_profile = db.relationship("Driver", back_populates="user_account", uselist=False)
     sponsor_profile = db.relationship("Sponsor", back_populates="user_account", uselist=False)
+    wants_security_notifications = db.Column(db.Boolean, default=True, nullable=False)
 
     #User account
     IS_ACTIVE = db.Column(db.Integer, nullable=False)
@@ -70,6 +83,20 @@ class User(db.Model, UserMixin):
     RESET_TOKEN_CREATED_AT = db.Column(db.DateTime, nullable=True)
     IS_LOCKED_OUT = db.Column(db.Integer, nullable=False)
     LOCKED_REASON = db.Column(db.String(255), nullable=True)
+    EMAIL_VERIFIED    = db.Column(db.Boolean, default=False)
+    EMAIL_2FA_ENABLED = db.Column(db.Boolean, default=False)
+
+
+    def default_dashboard_endpoint(self) -> str:
+        r = getattr(self, "USER_TYPE", None)
+        if r in (Role.DRIVER, "driver"):
+            return "driver_bp.dashboard"
+        if r in (Role.SPONSOR, "sponsor"):
+            return "sponsor_bp.dashboard"
+        if r in (Role.ADMINISTRATOR, "admin", "administrator"):
+            return "administrator_bp.dashboard"
+        # sensible fallback
+        return "common_bp.index"
     
     def log_event(self, event_type: str, details: str = None):
         log_entry = AuditLog(EVENT_TYPE=event_type, DETAILS=details)
@@ -80,32 +107,32 @@ class User(db.Model, UserMixin):
         self.PASS = bcrypt.generate_password_hash(password).decode("utf-8")
 
     def admin_set_new_pass(self) -> str:
-        word = random.choice(WORDS) 
+        word = random.choice(WORDS)
         num_digits = 6
         numbers = ''.join(secrets.choice(string.digits) for _ in range(num_digits))
         password = word + numbers
-        
+
         self.PASS = bcrypt.generate_password_hash(password).decode('utf-8')
-        
+
         return password
 
     def check_password(self, password : str) -> bool:
         if not self.PASS:
             return False
         return bcrypt.check_password_hash(self.PASS, password)
-    
+
     def is_account_locked(self) -> bool:
         if self.LOCKOUT_TIME and datetime.utcnow() < self.LOCKOUT_TIME:
             self.IS_LOCKED_OUT = 1
             return True
         return False
-    
+
     def get_totp_uri(self):
         return f'otpauth://totp/TripleTRewards:{self.USERNAME}?secret={self.TOTP_SECRET}&issuer=TripleTRewards'
-    
+
     def get_totp(self):
         return pyotp.TOTP(self.TOTP_SECRET)
-    
+
     def register_failed_attempt(self):
         self.FAILED_ATTEMPTS += 1
         if self.FAILED_ATTEMPTS >= LOCKOUT_ATTEMPTS:
@@ -124,36 +151,20 @@ class User(db.Model, UserMixin):
         self.RESET_TOKEN = token
         self.RESET_TOKEN_CREATED_AT = datetime.utcnow()
         return token
-    
+
     def clear_reset_token(self):
         self.RESET_TOKEN = None
         self.RESET_TOKEN_CREATED_AT = None
-        
+
     def get_id(self):
         return str(self.USER_CODE)
 
 class Driver(db.Model):
-    __tablename__ = "DRIVERS"
-
-    # DRIVER_ID acts as both PK and FK → USERS.USER_CODE
-    DRIVER_ID = db.Column(db.Integer, db.ForeignKey("USERS.USER_CODE"), primary_key=True)
-    LICENSE_NUMBER = db.Column(db.String(50))
-
-    user_account = db.relationship("User", back_populates="driver_profile")
-
-    sponsor_associations = db.relationship(
-        "DriverSponsorAssociation",
-        back_populates="driver",
-        cascade="all, delete-orphan"
-    )
-
-    applications = db.relationship(
-        "DriverApplication",
-        back_populates="driver",
-        cascade="all, delete-orphan"
-    )
-
-
+    __tablename__ = 'DRIVERS'
+    DRIVER_ID = db.Column(db.Integer, db.ForeignKey("USERS.USER_CODE", ondelete="CASCADE"), primary_key=True)
+    LICENSE_NUMBER = db.Column(db.String(50), nullable=False)
+    # points = db.Column(db.Integer, default=0, nullable=False)
+    applications = db.relationship("DriverApplication", back_populates="driver")
 
 class Sponsor(db.Model):
     __tablename__ = "SPONSORS"
@@ -192,8 +203,9 @@ class DriverApplication(db.Model):
     STATUS = db.Column(db.Enum("Pending", "Accepted", "Rejected", name="DRIVER_APPLICATION_STATUS"), default="Pending")
     REASON = db.Column(db.String(255))
     APPLIED_AT = db.Column(db.DateTime, server_default=db.func.now())
+    LICENSE_NUMBER = db.Column(db.String(50), nullable=True)
     driver = db.relationship("Driver", back_populates="applications")
-    sponsor = db.relationship("Sponsor", back_populates="applications")
+    organization = db.relationship("Organization", backref="driver_applications")
 
 class DriverSponsorAssociation(db.Model):
     __tablename__ = "DRIVER_SPONSOR_ASSOCIATION"
@@ -210,6 +222,7 @@ class DriverSponsorAssociation(db.Model):
 class StoreSettings(db.Model):
     __tablename__ = 'STORE_SETTINGS'
     id = db.Column(db.Integer, primary_key=True)
+    sponsor_id = db.Column(db.Integer, db.ForeignKey('SPONSORS.SPONSOR_ID'), nullable=False, unique=True)
     ebay_category_id = db.Column(db.String(50), nullable=False, default='2984')
     point_ratio = db.Column(db.Integer, nullable=False, default=10)
 
@@ -217,6 +230,7 @@ class CartItem(db.Model):
     __tablename__ = 'CART_ITEMS'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('USERS.USER_CODE'), nullable=False)
+    sponsor_id = db.Column(db.Integer, db.ForeignKey('SPONSORS.SPONSOR_ID'), nullable=False)
     item_id = db.Column(db.String(255), nullable=False)
     title = db.Column(db.String(255), nullable=False)
     price = db.Column(db.Float, nullable=False)
@@ -328,11 +342,11 @@ class Organization(db.Model):
     ORG_ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
     ORG_NAME = db.Column(db.String(100), unique=True, nullable=False)
     CREATED_AT = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    
+
 class ImpersonationLog(db.Model):
     __tablename__ = 'IMPERSONATION_LOG'
     id = db.Column(db.Integer, primary_key=True)
     actor_id = db.Column(db.Integer, db.ForeignKey('USERS.USER_CODE'), nullable=False)
     target_id = db.Column(db.Integer, db.ForeignKey('USERS.USER_CODE'), nullable=False)
-    action = db.Column(db.String(20), nullable=False)  # 'start' or 'stop'
+    action = db.Column(db.String(20), nullable=False)  
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
